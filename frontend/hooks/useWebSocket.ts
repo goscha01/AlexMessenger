@@ -12,10 +12,11 @@ export function useWebSocket() {
 
   useEffect(() => {
     // Create WebSocket connection
+    console.log('🔌 Attempting WebSocket connection to:', WS_URL);
     const ws = new WebSocket(WS_URL);
 
     ws.onopen = () => {
-      console.log('WebSocket connected');
+      console.log('✅ WebSocket connected successfully!');
       setConnected(true);
     };
 
