@@ -1,6 +1,4 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {
-  serverExternalPackages: ['playwright-core', '@sparticuz/chromium'],
-}
+const nextConfig = {}
 
 module.exports = nextConfig
