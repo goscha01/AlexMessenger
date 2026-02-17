@@ -4,7 +4,8 @@ import { z } from 'zod';
 
 // Pipeline imports
 import { extractContent } from '@/lib/ingest/extract';
-import { analyzeDesign } from '@/lib/llm/gemini';
+import { observeDesign } from '@/lib/llm/gemini';
+import { generateStyleSpec } from '@/lib/llm/styleDirector';
 import { generateBlockSchema } from '@/lib/llm/claude';
 import { generateLayoutPlan } from '@/lib/llm/layoutPlan';
 import { validateAndAutofixV2 } from '@/lib/rules/autofix';
@@ -146,7 +147,7 @@ async function runStep<T>(
 // ─── Health Check ───────────────────────────────────────────────────────────────
 
 app.get('/', (_req, res) => {
-  res.json({ status: 'ok', service: 'siteforge-backend', version: '2.0.0' });
+  res.json({ status: 'ok', service: 'siteforge-backend', version: '3.0.0' });
 });
 
 // ─── Redesign Pipeline ─────────────────────────────────────────────────────────
@@ -194,28 +195,38 @@ app.post('/redesign', async (req: Request, res: Response) => {
     console.log(`[pipeline]   Desktop screenshot: ${screenshots.desktop.length}B base64`);
     console.log(`[pipeline]   Mobile screenshot: ${screenshots.mobile.length}B base64`);
 
-    // Step B: Gemini Vision — design direction
-    const direction = await runStep(res, 'gemini_direction', () =>
-      analyzeDesign(screenshots.desktop, screenshots.mobile, {
+    // Step B: Gemini Vision — observations
+    const observations = await runStep(res, 'observe', () =>
+      observeDesign(screenshots.desktop, screenshots.mobile, {
         title: content.title,
         description: content.description,
         brandName: content.brandName,
       })
     );
 
-    console.log(`[pipeline]   Site type: "${direction.siteType}"`);
-    console.log(`[pipeline]   Mood: "${direction.mood}"`);
-    console.log(`[pipeline]   Layout: "${direction.layoutStyle}"`);
-    console.log(`[pipeline]   Suggested blocks: ${direction.suggestedBlocks.join(', ')}`);
+    console.log(`[pipeline]   Industry: ${observations.industryCandidates.map((c) => `${c.label}(${c.confidence})`).join(', ')}`);
+    console.log(`[pipeline]   Visual problems: ${observations.visualProblems.slice(0, 3).join('; ')}`);
+    console.log(`[pipeline]   Brand tone: "${observations.brandSignals.perceivedTone}"`);
+    console.log(`[pipeline]   Avoid: ${observations.avoidPatterns.join(', ')}`);
 
-    // Step B2: Layout Plan
-    const layoutPlan = await runStep(res, 'layout_plan', () =>
-      generateLayoutPlan(direction, content)
+    // Step B2: Style Director — signature + preset + fonts
+    const styleSpec = await runStep(res, 'style_director', () =>
+      generateStyleSpec(observations)
     );
 
-    console.log(`[pipeline]   Preset: "${layoutPlan.presetId}"`);
-    console.log(`[pipeline]   Font pairing: "${layoutPlan.fontPairingId}"`);
+    console.log(`[pipeline]   Signature: "${styleSpec.signature}"`);
+    console.log(`[pipeline]   Preset: "${styleSpec.presetId}"`);
+    console.log(`[pipeline]   Font pairing: "${styleSpec.fontPairingId}"`);
+    console.log(`[pipeline]   Density: "${styleSpec.density}"`);
+    console.log(`[pipeline]   Anti-template rules: ${styleSpec.antiTemplateRules.length}`);
+
+    // Step B3: Layout Plan
+    const layoutPlan = await runStep(res, 'layout_plan', () =>
+      generateLayoutPlan(styleSpec, content)
+    );
+
     console.log(`[pipeline]   Block order: ${layoutPlan.blockOrder.map((b) => `${b.type}(${b.variant})`).join(' → ')}`);
+    console.log(`[pipeline]   Diversity patterns: ${layoutPlan.diversityPatterns.join(', ')}`);
 
     // Step C: Claude — fill content into layout plan
     const rawSchema = await runStep(res, 'claude_content', () =>
@@ -260,11 +271,15 @@ app.post('/redesign', async (req: Request, res: Response) => {
       blocks: validatedV2.blocks,
     };
 
-    // Step D3: Score
-    const score = computeDesignScore(pageSchema, resolvedTokens);
-    sendEvent(res, { step: 'score', status: 'done', ms: 0, data: { total: score.total } });
+    // Determine signature from styleSpec or schema
+    const signature = validatedV2.signature || styleSpec.signature;
+    const density = styleSpec.density;
 
-    console.log(`[pipeline]   Design score: ${score.total}/100`);
+    // Step D3: Score
+    const score = computeDesignScore(pageSchema, resolvedTokens, signature);
+    sendEvent(res, { step: 'score', status: 'done', ms: 0, data: { total: score.total, mustImprove: score.mustImprove } });
+
+    console.log(`[pipeline]   Design score: ${score.total}/100 (mustImprove: ${score.mustImprove})`);
     for (const [category, detail] of Object.entries(score.breakdown)) {
       console.log(`[pipeline]     ${category}: ${detail.score}/${detail.max} — ${detail.notes}`);
     }
@@ -277,10 +292,13 @@ app.post('/redesign', async (req: Request, res: Response) => {
           ? valueBlock.items.map((item) => item.title)
           : [];
 
+        const topIndustry = observations.industryCandidates[0]?.label || 'business';
+        const tone = observations.brandSignals.perceivedTone || 'professional';
+
         const assets = await generateAssets(
           content.brandName,
-          direction.mood,
-          direction.siteType,
+          tone,
+          topIndustry,
           iconSubjects
         );
 
@@ -307,30 +325,30 @@ app.post('/redesign', async (req: Request, res: Response) => {
       });
     }
 
-    // Step F: Render deterministic HTML
+    // Step F: Render deterministic HTML with signature + density
     let html = await runStep(res, 'render', async () => {
-      return renderPageHtml(pageSchema, resolvedTokens);
+      return renderPageHtml(pageSchema, resolvedTokens, signature, density);
     });
 
     console.log(`[pipeline]   HTML length: ${html.length} chars`);
+    console.log(`[pipeline]   Signature applied: ${signature}`);
 
-    // Step G: Optional QA loop
+    // Step G: QA loop — run if requested OR if score says must improve
     let qaResult = undefined;
-    if (input.withQA && score.total < 75) {
+    const shouldRunQA = input.withQA || score.mustImprove;
+    if (shouldRunQA) {
       qaResult = await runStep(res, 'qa_loop', async () => {
-        const qa = await runQALoop(html, pageSchema, resolvedTokens, 1);
+        const qa = await runQALoop(html, pageSchema, resolvedTokens, 1, signature, density);
         if (qa.iterated) {
           html = qa.html;
           console.log(`[pipeline]   QA patched: ${qa.patches.length} patches applied`);
-          return { patches: qa.patches, critique: qa.critique };
+          console.log(`[pipeline]   QA diff: ${qa.diff.join('; ')}`);
+          return { patches: qa.patches, critique: qa.critique, diff: qa.diff };
         } else {
           console.log(`[pipeline]   QA: no patches needed`);
-          return { patches: [], critique: qa.critique };
+          return { patches: [], critique: qa.critique, diff: qa.diff };
         }
       });
-    } else if (input.withQA) {
-      console.log(`[pipeline]   QA skipped: score ${score.total} >= 75`);
-      sendEvent(res, { step: 'qa_loop', status: 'skipped', reason: `Score ${score.total} >= 75` });
     }
 
     // Done!
@@ -344,11 +362,14 @@ app.post('/redesign', async (req: Request, res: Response) => {
       result: {
         html,
         schema: pageSchema,
-        direction,
+        observations,
+        styleSpec,
         layoutPlan,
         score,
         qaResult,
         warnings,
+        signature,
+        density,
       },
     });
 
@@ -420,7 +441,7 @@ app.post('/screenshot-html', authenticate, async (req: Request, res: Response) =
 
 const PORT = process.env.PORT || 3001;
 app.listen(Number(PORT), '0.0.0.0', async () => {
-  console.log(`SiteForge backend v2.0.0 running on port ${PORT}`);
+  console.log(`SiteForge backend v3.0.0 running on port ${PORT}`);
 
   // Pre-warm browser
   try {

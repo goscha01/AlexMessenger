@@ -8,6 +8,11 @@ import { renderTestimonialsCards } from './blocks/TestimonialsCards';
 import { renderFAQAccordion } from './blocks/FAQAccordion';
 import { renderCTASection } from './blocks/CTASection';
 import { renderFooterSimple } from './blocks/FooterSimple';
+import { renderBentoGrid } from './blocks/BentoGrid';
+import { renderFeatureZigzag } from './blocks/FeatureZigzag';
+import { renderStatsBand } from './blocks/StatsBand';
+import { renderProcessTimeline } from './blocks/ProcessTimeline';
+import { getSignatureCSS, getSignatureStyles } from '@/lib/design/signatures';
 
 // HTML entity escaping for XSS prevention
 const ESCAPE_MAP: Record<string, string> = {
@@ -33,11 +38,24 @@ const BLOCK_RENDERERS: Record<string, BlockRenderer> = {
   FAQAccordion: renderFAQAccordion as BlockRenderer,
   CTASection: renderCTASection as BlockRenderer,
   FooterSimple: renderFooterSimple as BlockRenderer,
+  BentoGrid: renderBentoGrid as BlockRenderer,
+  FeatureZigzag: renderFeatureZigzag as BlockRenderer,
+  StatsBand: renderStatsBand as BlockRenderer,
+  ProcessTimeline: renderProcessTimeline as BlockRenderer,
 };
 
-export function renderPageHtml(schema: PageSchema, resolvedTokens: ResolvedDesignTokens): string {
+export function renderPageHtml(
+  schema: PageSchema,
+  resolvedTokens: ResolvedDesignTokens,
+  signature?: string,
+  density?: string,
+): string {
   const { blocks } = schema;
   const t = resolvedTokens;
+
+  const sig = signature ? getSignatureStyles(signature) : null;
+  const sigCSS = signature ? getSignatureCSS(signature) : '';
+  const wrapperClass = sig ? sig.sectionClass : '';
 
   const blockHtml = blocks
     .map((block: Block) => {
@@ -75,6 +93,10 @@ export function renderPageHtml(schema: PageSchema, resolvedTokens: ResolvedDesig
       --font-heading: '${t.typography.headingFont}', system-ui, sans-serif;
       --font-body: '${t.typography.bodyFont}', system-ui, sans-serif;
       --radius: ${t.borderRadius};
+      --primary: ${t.palette.primary};
+      --accent: ${t.palette.accent};
+      --background: ${t.palette.background};
+      --surface: ${t.palette.surface};
     }
     *, *::before, *::after { box-sizing: border-box; }
     body {
@@ -90,10 +112,13 @@ export function renderPageHtml(schema: PageSchema, resolvedTokens: ResolvedDesig
     }
     details summary { list-style: none; }
     details summary::-webkit-details-marker { display: none; }
+    ${sigCSS}
   </style>
 </head>
 <body>
+<div class="${wrapperClass}">
 ${blockHtml}
+</div>
 </body>
 </html>`;
 }

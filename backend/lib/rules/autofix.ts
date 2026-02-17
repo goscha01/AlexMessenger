@@ -5,6 +5,7 @@ import { DESIGN_PRESETS } from '@/lib/design/presets';
 import { FONT_PAIRINGS } from '@/lib/design/fonts';
 import { BLOCK_CATALOG } from '@/lib/catalog/blocks';
 import { isValidHex } from '@/lib/design/colorUtils';
+import { ensureDiversity } from '@/lib/design/diversify';
 
 const VALID_PRESET_IDS = new Set(DESIGN_PRESETS.map((p) => p.id));
 const VALID_FONT_IDS = new Set(FONT_PAIRINGS.map((f) => f.id));
@@ -13,11 +14,18 @@ for (const b of BLOCK_CATALOG) {
   DEFAULT_VARIANTS[b.type] = b.variants[0]?.id ?? '';
 }
 
-/**
- * Applies deterministic fixes to common issues before resorting to Claude repair.
- */
+const VALID_VARIANTS: Record<string, Set<string>> = {};
+for (const b of BLOCK_CATALOG) {
+  VALID_VARIANTS[b.type] = new Set(b.variants.map((v) => v.id));
+}
+
 function deterministicFix(raw: Record<string, unknown>): Record<string, unknown> {
   const fixed = { ...raw };
+
+  // Fix missing signature
+  if (!fixed.signature || typeof fixed.signature !== 'string') {
+    fixed.signature = 'monoMinimal';
+  }
 
   // Fix invalid presetId
   if (typeof fixed.presetId !== 'string' || !VALID_PRESET_IDS.has(fixed.presetId)) {
@@ -26,7 +34,7 @@ function deterministicFix(raw: Record<string, unknown>): Record<string, unknown>
 
   // Fix invalid fontPairingId
   if (fixed.fontPairingId && (typeof fixed.fontPairingId !== 'string' || !VALID_FONT_IDS.has(fixed.fontPairingId))) {
-    delete fixed.fontPairingId; // let preset default apply
+    delete fixed.fontPairingId;
   }
 
   // Fix invalid hex in tokenTweaks
@@ -50,6 +58,12 @@ function deterministicFix(raw: Record<string, unknown>): Record<string, unknown>
       if (typeof b.type === 'string' && DEFAULT_VARIANTS[b.type]) {
         if (!b.variant || typeof b.variant !== 'string') {
           b.variant = DEFAULT_VARIANTS[b.type];
+        } else {
+          // Validate variant exists for this block type
+          const validSet = VALID_VARIANTS[b.type];
+          if (validSet && !validSet.has(b.variant as string)) {
+            b.variant = DEFAULT_VARIANTS[b.type];
+          }
         }
       }
 
@@ -86,32 +100,53 @@ export async function validateAndAutofixV2(
   let result = validatePageSchemaV2(fixed);
 
   if (result.valid && result.data) {
+    // Apply diversity enforcement
+    const { schema: diversified, changes } = ensureDiversity(result.data);
+    if (changes.length > 0) {
+      console.log('[autofix] Diversity changes:', changes);
+      // Re-validate after diversification
+      const reResult = validatePageSchemaV2(diversified);
+      if (reResult.valid && reResult.data) {
+        return {
+          schema: reResult.data,
+          warnings: [...result.warnings, ...changes.map((c) => `[diversity] ${c}`)],
+        };
+      }
+      // If diversification broke validation, return original
+      return { schema: result.data, warnings: [...result.warnings, 'Diversity changes failed validation'] };
+    }
     return { schema: result.data, warnings: result.warnings };
   }
 
   // If invalid, try Claude repair (single attempt)
-  console.log('V2 schema validation failed, attempting repair...', result.errors);
+  console.log('[autofix] V2 schema validation failed, attempting repair...', result.errors);
 
   const repaired = await repairSchema(
     JSON.stringify(fixed, null, 2),
     result.errors
   );
 
-  // Convert repaired PageSchema to a re-validation of the original shape
-  // (repair returns PageSchema with tokens, but we need V2)
   const reResult = validatePageSchemaV2({
+    signature: (fixed as Record<string, unknown>).signature || 'monoMinimal',
     presetId: (fixed as Record<string, unknown>).presetId || 'corporate-blue',
     blocks: repaired.blocks,
   });
 
   if (reResult.valid && reResult.data) {
-    return {
-      schema: reResult.data,
-      warnings: [...reResult.warnings, 'Schema was auto-repaired by Claude.'],
-    };
+    const { schema: diversified, changes } = ensureDiversity(reResult.data);
+    const allWarnings = [
+      ...reResult.warnings,
+      'Schema was auto-repaired by Claude.',
+      ...changes.map((c) => `[diversity] ${c}`),
+    ];
+    // Re-validate after diversity
+    const finalResult = validatePageSchemaV2(diversified);
+    if (finalResult.valid && finalResult.data) {
+      return { schema: finalResult.data, warnings: allWarnings };
+    }
+    return { schema: reResult.data, warnings: [...reResult.warnings, 'Schema was auto-repaired by Claude.'] };
   }
 
-  // If repair also fails, throw with details
   throw new Error(
     `V2 schema validation failed after repair attempt. Errors: ${reResult.errors.join('; ')}`
   );

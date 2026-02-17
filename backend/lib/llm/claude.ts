@@ -4,11 +4,11 @@ import {
   PageSchemaV2Output,
   PageSchema,
   PageSchemaOutput,
-  LayoutPlan,
+  LayoutPlanV2,
   ExtractedContent,
 } from '@/lib/catalog/schemas';
 import { BLOCK_CATALOG } from '@/lib/catalog/blocks';
-import { claudeSchemaPrompt, claudeRepairPrompt } from './prompts';
+import { claudeContentPrompt, claudeRepairPrompt } from './prompts';
 
 function getClient(): Anthropic {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -17,7 +17,6 @@ function getClient(): Anthropic {
 }
 
 function extractJson(text: string): string {
-  // Strip markdown code fences if present
   return text
     .replace(/^```(?:json)?\s*\n?/, '')
     .replace(/\n?```\s*$/, '')
@@ -25,7 +24,7 @@ function extractJson(text: string): string {
 }
 
 export async function generateBlockSchema(
-  layoutPlan: LayoutPlan,
+  layoutPlan: LayoutPlanV2,
   content: ExtractedContent
 ): Promise<PageSchemaV2> {
   const client = getClient();
@@ -36,7 +35,7 @@ export async function generateBlockSchema(
     messages: [
       {
         role: 'user',
-        content: claudeSchemaPrompt(layoutPlan, content, BLOCK_CATALOG),
+        content: claudeContentPrompt(layoutPlan, content, BLOCK_CATALOG),
       },
     ],
   });

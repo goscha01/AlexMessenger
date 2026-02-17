@@ -13,22 +13,45 @@ interface ScoreBreakdown {
 interface PipelineResult {
   html: string;
   schema: Record<string, unknown>;
-  direction: Record<string, unknown>;
-  layoutPlan?: {
+  observations: {
+    industryCandidates: { label: string; confidence: number }[];
+    visualProblems: string[];
+    visualGoals: string[];
+    brandSignals: { perceivedTone: string; complexity: string; trustLevel: string };
+    paletteObserved: { primary?: string; accents?: string[]; background?: string };
+    avoidPatterns: string[];
+  };
+  styleSpec: {
+    signature: string;
     presetId: string;
     fontPairingId: string;
+    density: string;
+    visualMotifs: string[];
+    sectionSeparators: string;
+    antiTemplateRules: string[];
+  };
+  layoutPlan?: {
+    signature: string;
+    presetId: string;
+    fontPairingId: string;
+    density: string;
     blockOrder: { type: string; variant: string; rationale: string }[];
+    diversityPatterns: string[];
     designRationale: string;
   };
   score?: {
     total: number;
+    mustImprove: boolean;
     breakdown: ScoreBreakdown;
   };
   qaResult?: {
-    patches: { blockIndex: number; field: string; oldValue: string; newValue: string; reason: string }[];
+    patches: { action: string; blockIndex: number; field?: string; oldValue?: string; newValue?: string; newBlockType?: string; newVariant?: string; reason: string }[];
     critique: string;
+    diff: string[];
   };
   warnings: string[];
+  signature: string;
+  density: string;
 }
 
 interface StepInfo {
@@ -49,7 +72,8 @@ type Tab = 'preview' | 'html' | 'schema' | 'debug';
 const STEP_LABELS: Record<string, string> = {
   screenshots: 'Capturing screenshots',
   extract: 'Extracting content',
-  gemini_direction: 'Analyzing design (Gemini)',
+  observe: 'Observing design (Gemini)',
+  style_director: 'Selecting style signature',
   layout_plan: 'Creating layout plan',
   claude_content: 'Generating content (Claude)',
   validate: 'Validating schema',
@@ -65,13 +89,21 @@ function resolveBackendUrl(): string {
 }
 const BACKEND_URL = resolveBackendUrl();
 
-function ScoreBadge({ score }: { score: number }) {
+function ScoreBadge({ score, mustImprove }: { score: number; mustImprove?: boolean }) {
   const color = score >= 80 ? 'bg-green-100 text-green-800' :
     score >= 60 ? 'bg-yellow-100 text-yellow-800' :
     'bg-red-100 text-red-800';
   return (
     <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${color}`}>
-      Score: {score}/100
+      Score: {score}/100{mustImprove ? ' (needs QA)' : ''}
+    </span>
+  );
+}
+
+function SignatureBadge({ signature }: { signature: string }) {
+  return (
+    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
+      {signature}
     </span>
   );
 }
@@ -231,13 +263,21 @@ export default function Home() {
     navigator.clipboard.writeText(state.data.html);
   }
 
+  // Count diversity blocks in schema
+  const diversityBlockTypes = new Set(['BentoGrid', 'FeatureZigzag', 'StatsBand', 'ProcessTimeline']);
+  function countDiversityBlocks(schema: Record<string, unknown>): number {
+    const blocks = (schema as { blocks?: { type: string }[] }).blocks;
+    if (!Array.isArray(blocks)) return 0;
+    return blocks.filter((b) => diversityBlockTypes.has(b.type)).length;
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <h1 className="text-xl font-bold text-gray-900">AI Website Redesign</h1>
-          <span className="text-xs text-gray-400">POC v2.1 — Railway backend</span>
+          <span className="text-xs text-gray-400">v3.0 — Signature Pipeline</span>
         </div>
       </header>
 
@@ -336,7 +376,12 @@ export default function Home() {
                     </button>
                   ))}
                 </div>
-                {state.data.score && <ScoreBadge score={state.data.score.total} />}
+                {state.data.score && (
+                  <ScoreBadge score={state.data.score.total} mustImprove={state.data.score.mustImprove} />
+                )}
+                {state.data.signature && (
+                  <SignatureBadge signature={state.data.signature} />
+                )}
               </div>
 
               <div className="flex gap-2">
@@ -411,12 +456,57 @@ export default function Home() {
                     </div>
                   )}
 
+                  {/* Style Spec Summary */}
+                  {state.data.styleSpec && (
+                    <div>
+                      <h3 className="font-semibold text-gray-900 mb-2">Style Specification</h3>
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-2">
+                        <div className="flex flex-wrap gap-4 text-sm">
+                          <span className="text-gray-500">Signature:</span>
+                          <code className="font-semibold text-purple-700">{state.data.styleSpec.signature}</code>
+                          <span className="text-gray-500 ml-4">Preset:</span>
+                          <code className="text-gray-700">{state.data.styleSpec.presetId}</code>
+                          <span className="text-gray-500 ml-4">Density:</span>
+                          <code className="text-gray-700">{state.data.styleSpec.density}</code>
+                        </div>
+                        <div className="flex flex-wrap gap-4 text-sm">
+                          <span className="text-gray-500">Fonts:</span>
+                          <code className="text-gray-700">{state.data.styleSpec.fontPairingId}</code>
+                          <span className="text-gray-500 ml-4">Separators:</span>
+                          <code className="text-gray-700">{state.data.styleSpec.sectionSeparators}</code>
+                        </div>
+                        {state.data.styleSpec.visualMotifs.length > 0 && (
+                          <div className="text-sm">
+                            <span className="text-gray-500">Motifs: </span>
+                            {state.data.styleSpec.visualMotifs.map((m, i) => (
+                              <span key={i} className="inline-block bg-gray-200 text-gray-700 px-2 py-0.5 rounded text-xs mr-1">{m}</span>
+                            ))}
+                          </div>
+                        )}
+                        {state.data.styleSpec.antiTemplateRules.length > 0 && (
+                          <div className="text-sm">
+                            <span className="text-gray-500">Anti-template rules: </span>
+                            {state.data.styleSpec.antiTemplateRules.map((r, i) => (
+                              <span key={i} className="inline-block bg-red-50 text-red-700 px-2 py-0.5 rounded text-xs mr-1">{r}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Design Score */}
                   {state.data.score && (
                     <div>
                       <h3 className="font-semibold text-gray-900 mb-2">
                         Design Score: {state.data.score.total}/100
+                        {state.data.score.mustImprove && (
+                          <span className="text-sm font-normal text-red-600 ml-2">(must improve)</span>
+                        )}
                       </h3>
+                      <div className="text-sm text-gray-500 mb-2">
+                        Diversity blocks: {countDiversityBlocks(state.data.schema)}
+                      </div>
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
@@ -447,12 +537,24 @@ export default function Home() {
                     <div>
                       <h3 className="font-semibold text-gray-900 mb-2">Layout Plan</h3>
                       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
-                        <div className="flex gap-4 text-sm">
-                          <span className="text-gray-500">Preset:</span>
+                        <div className="flex flex-wrap gap-4 text-sm">
+                          <span className="text-gray-500">Signature:</span>
+                          <code className="text-purple-700">{state.data.layoutPlan.signature}</code>
+                          <span className="text-gray-500 ml-4">Preset:</span>
                           <code className="text-gray-700">{state.data.layoutPlan.presetId}</code>
                           <span className="text-gray-500 ml-4">Fonts:</span>
                           <code className="text-gray-700">{state.data.layoutPlan.fontPairingId}</code>
+                          <span className="text-gray-500 ml-4">Density:</span>
+                          <code className="text-gray-700">{state.data.layoutPlan.density}</code>
                         </div>
+                        {state.data.layoutPlan.diversityPatterns.length > 0 && (
+                          <div className="text-sm">
+                            <span className="text-gray-500">Diversity patterns: </span>
+                            {state.data.layoutPlan.diversityPatterns.map((p, i) => (
+                              <span key={i} className="inline-block bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs mr-1">{p}</span>
+                            ))}
+                          </div>
+                        )}
                         <p className="text-sm text-gray-600">{state.data.layoutPlan.designRationale}</p>
                         <div className="space-y-1">
                           {state.data.layoutPlan.blockOrder.map((block, i) => (
@@ -473,19 +575,41 @@ export default function Home() {
                     <div>
                       <h3 className="font-semibold text-gray-900 mb-2">Visual QA</h3>
                       <p className="text-sm text-gray-600 mb-3">{state.data.qaResult.critique}</p>
+                      {state.data.qaResult.diff && state.data.qaResult.diff.length > 0 && (
+                        <div className="mb-3 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                          <p className="text-xs text-gray-500 font-medium mb-1">Schema Diff</p>
+                          {state.data.qaResult.diff.map((d, i) => (
+                            <p key={i} className="text-sm font-mono text-gray-700">{d}</p>
+                          ))}
+                        </div>
+                      )}
                       {state.data.qaResult.patches.length > 0 ? (
                         <div className="space-y-2">
                           {state.data.qaResult.patches.map((patch, i) => (
                             <div key={i} className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm">
                               <div className="flex items-center gap-2 mb-1">
-                                <span className="font-mono text-gray-400">Block[{patch.blockIndex}].{patch.field}</span>
-                                <span className="text-gray-500">— {patch.reason}</span>
+                                <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                                  patch.action === 'modify' ? 'bg-blue-100 text-blue-700' :
+                                  patch.action === 'swap-variant' ? 'bg-purple-100 text-purple-700' :
+                                  patch.action === 'insert' ? 'bg-green-100 text-green-700' :
+                                  patch.action === 'remove' ? 'bg-red-100 text-red-700' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>{patch.action}</span>
+                                <span className="font-mono text-gray-400">
+                                  Block[{patch.blockIndex}]
+                                  {patch.field && `.${patch.field}`}
+                                  {patch.newBlockType && ` ${patch.newBlockType}`}
+                                  {patch.newVariant && ` → ${patch.newVariant}`}
+                                </span>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <span className="line-through text-red-400">{patch.oldValue}</span>
-                                <span className="text-gray-400">&rarr;</span>
-                                <span className="text-green-700">{patch.newValue}</span>
-                              </div>
+                              <p className="text-gray-500">{patch.reason}</p>
+                              {patch.oldValue && patch.newValue && (
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="line-through text-red-400 text-xs truncate max-w-[200px]">{patch.oldValue}</span>
+                                  <span className="text-gray-400">&rarr;</span>
+                                  <span className="text-green-700 text-xs truncate max-w-[200px]">{patch.newValue}</span>
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -495,15 +619,75 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* Design Direction */}
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-2">Design Direction (Gemini)</h3>
-                    <pre className="font-mono text-sm bg-gray-50 border border-gray-200 rounded-lg p-4 overflow-auto max-h-96">
-                      {JSON.stringify(state.data.direction, null, 2)}
-                    </pre>
-                  </div>
+                  {/* Observations (Gemini) */}
+                  {state.data.observations && (
+                    <div>
+                      <h3 className="font-semibold text-gray-900 mb-2">Observations (Gemini)</h3>
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+                        <div className="text-sm">
+                          <span className="text-gray-500">Industry: </span>
+                          {state.data.observations.industryCandidates.map((c, i) => (
+                            <span key={i} className="inline-block bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs mr-1">
+                              {c.label} ({(c.confidence * 100).toFixed(0)}%)
+                            </span>
+                          ))}
+                        </div>
+                        <div className="text-sm">
+                          <span className="text-gray-500">Brand: </span>
+                          <span className="text-gray-700">
+                            {state.data.observations.brandSignals.perceivedTone} / {state.data.observations.brandSignals.complexity} / trust: {state.data.observations.brandSignals.trustLevel}
+                          </span>
+                        </div>
+                        {state.data.observations.visualProblems.length > 0 && (
+                          <div className="text-sm">
+                            <p className="text-gray-500 mb-1">Visual Problems:</p>
+                            <ul className="list-disc list-inside space-y-0.5">
+                              {state.data.observations.visualProblems.map((p, i) => (
+                                <li key={i} className="text-red-600">{p}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {state.data.observations.visualGoals.length > 0 && (
+                          <div className="text-sm">
+                            <p className="text-gray-500 mb-1">Visual Goals:</p>
+                            <ul className="list-disc list-inside space-y-0.5">
+                              {state.data.observations.visualGoals.map((g, i) => (
+                                <li key={i} className="text-green-700">{g}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {state.data.observations.avoidPatterns.length > 0 && (
+                          <div className="text-sm">
+                            <span className="text-gray-500">Avoid: </span>
+                            {state.data.observations.avoidPatterns.map((a, i) => (
+                              <span key={i} className="inline-block bg-red-50 text-red-600 px-2 py-0.5 rounded text-xs mr-1">{a}</span>
+                            ))}
+                          </div>
+                        )}
+                        {state.data.observations.paletteObserved.primary && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="text-gray-500">Observed palette:</span>
+                            {state.data.observations.paletteObserved.primary && (
+                              <span className="flex items-center gap-1">
+                                <span className="inline-block w-4 h-4 rounded border border-gray-300" style={{ backgroundColor: state.data.observations.paletteObserved.primary }} />
+                                <code className="text-gray-600 text-xs">{state.data.observations.paletteObserved.primary}</code>
+                              </span>
+                            )}
+                            {state.data.observations.paletteObserved.accents?.map((a, i) => (
+                              <span key={i} className="flex items-center gap-1">
+                                <span className="inline-block w-4 h-4 rounded border border-gray-300" style={{ backgroundColor: a }} />
+                                <code className="text-gray-600 text-xs">{a}</code>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
-                  {/* Tokens */}
+                  {/* Design Tokens */}
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-2">Design Tokens</h3>
                     <div className="flex flex-wrap gap-4">

@@ -13,6 +13,10 @@ export function renderCTASection(block: CTASectionBlock, tokens: ResolvedDesignT
       return renderCardCentered(block, palette, typography, borderRadius, spacing);
     case 'split-cta':
       return renderSplitCta(block, palette, typography, borderRadius, spacing);
+    case 'card-inset':
+      return renderCardInset(block, palette, typography, borderRadius, spacing);
+    case 'minimal':
+      return renderMinimal(block, palette, typography, borderRadius, spacing);
     case 'gradient-bg':
     default:
       return renderGradientBg(block, palette, typography, borderRadius, spacing);
@@ -121,6 +125,73 @@ function renderSplitCta(
         </a>
       </div>
     </div>
+  </div>
+</section>`;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Variant: card-inset                                                */
+/*  Inset card with border — contained and clean                       */
+/* ------------------------------------------------------------------ */
+function renderCardInset(
+  block: CTASectionBlock,
+  palette: ResolvedDesignTokens['palette'],
+  typography: ResolvedDesignTokens['typography'],
+  borderRadius: string,
+  _spacing: string,
+): string {
+  return `
+<section class="py-16 lg:py-24" style="background: ${palette.background};">
+  <div class="max-w-4xl mx-auto px-6">
+    <div class="text-center px-8 py-12 lg:px-14 lg:py-16"
+         style="border: 2px solid ${palette.accent}30; border-radius: ${borderRadius};">
+      <h2 class="text-2xl lg:text-3xl font-bold mb-3"
+          style="color: ${palette.textPrimary}; font-family: '${typography.headingFont}', sans-serif;">
+        ${escapeHtml(block.headline)}
+      </h2>
+      ${
+        block.subtext
+          ? `<p class="text-base mb-8 max-w-xl mx-auto" style="color: ${palette.textSecondary}; font-family: '${typography.bodyFont}', sans-serif;">${escapeHtml(block.subtext)}</p>`
+          : '<div class="mb-6"></div>'
+      }
+      <a href="${escapeHtml(block.ctaHref)}"
+         class="inline-block px-8 py-3 text-white font-semibold transition-all duration-200 hover:shadow-lg"
+         style="background-color: ${palette.accent}; border-radius: ${borderRadius};">
+        ${escapeHtml(block.ctaText)}
+      </a>
+    </div>
+  </div>
+</section>`;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Variant: minimal                                                   */
+/*  Simple text + button — no background treatment                     */
+/* ------------------------------------------------------------------ */
+function renderMinimal(
+  block: CTASectionBlock,
+  palette: ResolvedDesignTokens['palette'],
+  typography: ResolvedDesignTokens['typography'],
+  borderRadius: string,
+  _spacing: string,
+): string {
+  return `
+<section class="py-12 lg:py-16" style="background: ${palette.background};">
+  <div class="max-w-3xl mx-auto px-6 text-center">
+    <h2 class="text-2xl lg:text-3xl font-bold mb-3"
+        style="color: ${palette.textPrimary}; font-family: '${typography.headingFont}', sans-serif;">
+      ${escapeHtml(block.headline)}
+    </h2>
+    ${
+      block.subtext
+        ? `<p class="text-base mb-6" style="color: ${palette.textSecondary}; font-family: '${typography.bodyFont}', sans-serif;">${escapeHtml(block.subtext)}</p>`
+        : '<div class="mb-4"></div>'
+    }
+    <a href="${escapeHtml(block.ctaHref)}"
+       class="inline-block px-6 py-3 font-semibold transition-all duration-200 hover:shadow-md border-2"
+       style="color: ${palette.accent}; border-color: ${palette.accent}; border-radius: ${borderRadius};">
+      ${escapeHtml(block.ctaText)}
+    </a>
   </div>
 </section>`;
 }

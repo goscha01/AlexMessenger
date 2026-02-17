@@ -24,6 +24,10 @@ export const BLOCK_CATALOG: BlockMeta[] = [
       { id: 'split-left', name: 'Split Left', description: 'Text left, image/gradient right — classic SaaS layout' },
       { id: 'split-right', name: 'Split Right', description: 'Image/gradient left, text right — reversed layout' },
       { id: 'centered', name: 'Centered', description: 'Full-width centered text over background gradient' },
+      { id: 'asymmetric', name: 'Asymmetric', description: 'Off-center text with large accent shape — editorial feel' },
+      { id: 'boxed', name: 'Boxed', description: 'Content in a contained card over full-bleed background' },
+      { id: 'editorial', name: 'Editorial', description: 'Large serif headline with minimal layout — magazine style' },
+      { id: 'color-block', name: 'Color Block', description: 'Bold color split — text on one color, accent on other' },
     ],
   },
   {
@@ -57,6 +61,7 @@ export const BLOCK_CATALOG: BlockMeta[] = [
       { id: 'logo-bar', name: 'Logo Bar', description: 'Simple horizontal row of names/logos' },
       { id: 'ticker', name: 'Ticker', description: 'Auto-scrolling marquee of names — dynamic feel' },
       { id: 'grid', name: 'Grid', description: 'Grid layout of name badges' },
+      { id: 'stats-only', name: 'Stats Only', description: 'Numeric stats row — "500+ clients, 99% uptime"' },
     ],
   },
   {
@@ -90,6 +95,8 @@ export const BLOCK_CATALOG: BlockMeta[] = [
       { id: 'gradient-bg', name: 'Gradient Background', description: 'Bold gradient background with white text' },
       { id: 'card-centered', name: 'Card Centered', description: 'Floating card on subtle background' },
       { id: 'split-cta', name: 'Split CTA', description: 'Text left, button right — inline layout' },
+      { id: 'card-inset', name: 'Card Inset', description: 'Inset card with border — contained and clean' },
+      { id: 'minimal', name: 'Minimal', description: 'Simple text + button — no background treatment' },
     ],
   },
   {
@@ -101,6 +108,51 @@ export const BLOCK_CATALOG: BlockMeta[] = [
       { id: 'minimal', name: 'Minimal', description: 'Single line — brand left, links right' },
       { id: 'columns', name: 'Columns', description: 'Multi-column footer with grouped links' },
       { id: 'centered', name: 'Centered', description: 'All elements centered in a single column' },
+    ],
+  },
+  // ===== New Blocks =====
+  {
+    type: 'BentoGrid',
+    displayName: 'Bento Grid',
+    description: 'Asymmetric grid of feature cards with varying sizes — modern dashboard feel',
+    requiredFields: ['sectionTitle', 'items[].title', 'items[].description'],
+    variants: [
+      { id: '2x2', name: '2x2 Grid', description: 'Even 2-column grid — balanced and clean' },
+      { id: '3-col', name: '3 Column', description: '3-column grid — fits more items' },
+      { id: 'mixed', name: 'Mixed Sizes', description: 'Asymmetric grid with wide/tall items — dynamic layout' },
+    ],
+  },
+  {
+    type: 'FeatureZigzag',
+    displayName: 'Feature Zigzag',
+    description: 'Alternating left-right feature sections — breaks visual monotony',
+    requiredFields: ['sectionTitle', 'items[].title', 'items[].description'],
+    variants: [
+      { id: 'standard', name: 'Standard', description: 'Alternating text blocks left-right' },
+      { id: 'with-image', name: 'With Image', description: 'Each row has an image placeholder opposite the text' },
+      { id: 'numbered', name: 'Numbered', description: 'Large step numbers — process-oriented zigzag' },
+    ],
+  },
+  {
+    type: 'StatsBand',
+    displayName: 'Stats Band',
+    description: 'Horizontal band of key metrics/numbers — builds credibility',
+    requiredFields: ['items[].value', 'items[].label'],
+    variants: [
+      { id: 'dark', name: 'Dark Background', description: 'White text on dark band — high contrast impact' },
+      { id: 'accent', name: 'Accent Background', description: 'Numbers on brand accent color' },
+      { id: 'minimal', name: 'Minimal', description: 'Numbers on white/transparent — subtle' },
+    ],
+  },
+  {
+    type: 'ProcessTimeline',
+    displayName: 'Process Timeline',
+    description: 'Step-by-step process visualization — shows workflow or methodology',
+    requiredFields: ['sectionTitle', 'steps[].title', 'steps[].description'],
+    variants: [
+      { id: 'vertical', name: 'Vertical', description: 'Vertical timeline with connecting line' },
+      { id: 'horizontal', name: 'Horizontal', description: 'Horizontal step flow — left to right' },
+      { id: 'cards', name: 'Cards', description: 'Numbered cards in a grid — clean step display' },
     ],
   },
 ];

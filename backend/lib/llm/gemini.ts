@@ -1,12 +1,12 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { DesignDirectionBrief, DesignDirectionBriefSchema } from '@/lib/catalog/schemas';
-import { geminiDesignPrompt } from './prompts';
+import { GeminiObservations, GeminiObservationsSchema } from '@/lib/catalog/schemas';
+import { geminiObservationsPrompt } from './prompts';
 
-export async function analyzeDesign(
+export async function observeDesign(
   desktopScreenshot: string,
   mobileScreenshot: string,
   context: { title: string; description: string; brandName: string }
-): Promise<DesignDirectionBrief> {
+): Promise<GeminiObservations> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY not set');
 
@@ -20,7 +20,7 @@ export async function analyzeDesign(
   });
 
   const result = await model.generateContent([
-    { text: geminiDesignPrompt(context) },
+    { text: geminiObservationsPrompt(context) },
     {
       inlineData: {
         mimeType: 'image/png',
@@ -37,5 +37,8 @@ export async function analyzeDesign(
 
   const text = result.response.text();
   const json = JSON.parse(text);
-  return DesignDirectionBriefSchema.parse(json);
+  return GeminiObservationsSchema.parse(json);
 }
+
+// Legacy alias
+export const analyzeDesign = observeDesign;

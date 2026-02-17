@@ -11,39 +11,51 @@ interface ScoreCategory {
 
 export interface DesignScoreResult {
   total: number;
+  mustImprove: boolean;
   breakdown: Record<string, ScoreCategory>;
 }
 
+// Default forbidden sequence — the "SaaS template" we want to avoid
+const DEFAULT_SEQUENCE = ['HeroSplit', 'ValueProps3', 'SocialProofRow', 'CTASection', 'FooterSimple'];
+
+// Non-standard block types that indicate layout diversity
+const DIVERSITY_BLOCKS = new Set([
+  'BentoGrid', 'FeatureZigzag', 'StatsBand', 'ProcessTimeline',
+]);
+
 export function computeDesignScore(
   schema: PageSchema,
-  tokens: ResolvedDesignTokens
+  tokens: ResolvedDesignTokens,
+  signature?: string
 ): DesignScoreResult {
   const breakdown: Record<string, ScoreCategory> = {};
 
-  // Contrast (25 pts)
+  // Contrast (20 pts)
   breakdown.contrast = scoreContrast(tokens);
 
-  // Hierarchy (20 pts)
+  // Hierarchy (10 pts)
   breakdown.hierarchy = scoreHierarchy(schema);
 
-  // Content density (15 pts)
-  breakdown.contentDensity = scoreContentDensity(schema);
+  // Layout Diversity (25 pts) — the big one
+  breakdown.layoutDiversity = scoreLayoutDiversity(schema);
 
-  // CTA quality (15 pts)
-  breakdown.ctaQuality = scoreCTAQuality(schema);
+  // Signature Presence (20 pts)
+  breakdown.signaturePresence = scoreSignaturePresence(schema, signature);
 
   // Typography (10 pts)
   breakdown.typography = scoreTypography(tokens);
 
-  // Color harmony (10 pts)
-  breakdown.colorHarmony = scoreColorHarmony(tokens);
+  // Rhythm Variety (10 pts)
+  breakdown.rhythmVariety = scoreRhythmVariety(schema);
 
-  // Visual variety (5 pts)
-  breakdown.visualVariety = scoreVisualVariety(schema);
+  // Anti-Template (5 pts)
+  breakdown.antiTemplate = scoreAntiTemplate(schema);
 
   const total = Object.values(breakdown).reduce((sum, cat) => sum + cat.score, 0);
+  const hasSignatureBlocks = schema.blocks.some((b) => DIVERSITY_BLOCKS.has(b.type));
+  const mustImprove = total < 60 || !hasSignatureBlocks;
 
-  return { total, breakdown };
+  return { total, mustImprove, breakdown };
 }
 
 function scoreContrast(tokens: ResolvedDesignTokens): ScoreCategory {
@@ -54,39 +66,39 @@ function scoreContrast(tokens: ResolvedDesignTokens): ScoreCategory {
   // Primary text on background
   const primaryOnBg = contrastRatio(palette.textPrimary, palette.background);
   if (primaryOnBg >= 7) {
-    score += 10;
+    score += 8;
   } else if (primaryOnBg >= 4.5) {
-    score += 7;
+    score += 5;
     notes.push(`Primary text contrast ${primaryOnBg.toFixed(1)}:1 (AA but not AAA)`);
   } else {
     notes.push(`Primary text contrast FAILS AA: ${primaryOnBg.toFixed(1)}:1`);
   }
 
-  // Accent on background (for buttons)
+  // Accent on background
   const accentOnBg = contrastRatio(palette.accent, palette.background);
   if (accentOnBg >= 4.5) {
-    score += 8;
+    score += 6;
   } else if (accentOnBg >= 3) {
-    score += 5;
+    score += 4;
     notes.push(`Accent contrast ${accentOnBg.toFixed(1)}:1 — borderline`);
   } else {
     notes.push(`Accent fails contrast: ${accentOnBg.toFixed(1)}:1`);
   }
 
-  // White text on accent (button text readability)
+  // Button text readability
   const whiteOnAccent = contrastRatio('#FFFFFF', palette.accent);
   const blackOnAccent = contrastRatio('#000000', palette.accent);
   const bestBtnContrast = Math.max(whiteOnAccent, blackOnAccent);
   if (bestBtnContrast >= 4.5) {
-    score += 7;
+    score += 6;
   } else if (bestBtnContrast >= 3) {
-    score += 4;
+    score += 3;
     notes.push('Button text contrast is borderline');
   } else {
     notes.push('Button text contrast fails');
   }
 
-  return { score, max: 25, notes: notes.join('; ') || 'All contrast checks pass' };
+  return { score, max: 20, notes: notes.join('; ') || 'All contrast checks pass' };
 }
 
 function scoreHierarchy(schema: PageSchema): ScoreCategory {
@@ -95,93 +107,117 @@ function scoreHierarchy(schema: PageSchema): ScoreCategory {
 
   // Hero first
   if (schema.blocks[0]?.type === 'HeroSplit') {
-    score += 8;
+    score += 4;
   } else {
     notes.push('Hero is not the first block');
   }
 
   // Footer last
   if (schema.blocks[schema.blocks.length - 1]?.type === 'FooterSimple') {
-    score += 6;
+    score += 3;
   } else {
     notes.push('Footer is not the last block');
   }
 
-  // Logical ordering: no CTA before main content
-  const firstContentIdx = schema.blocks.findIndex(
-    (b) => b.type === 'ValueProps3' || b.type === 'ServicesGrid'
+  // CTA present
+  const hasCTA = schema.blocks.some((b) => b.type === 'CTASection');
+  if (hasCTA) {
+    score += 3;
+  } else {
+    notes.push('No CTA section found');
+  }
+
+  return { score, max: 10, notes: notes.join('; ') || 'Good visual hierarchy' };
+}
+
+function scoreLayoutDiversity(schema: PageSchema): ScoreCategory {
+  let score = 0;
+  const notes: string[] = [];
+
+  const blockTypes = schema.blocks.map((b) => b.type);
+  const uniqueTypes = new Set(blockTypes);
+
+  // Count distinct block types (excluding hero/footer which are structural)
+  const contentTypes = new Set(
+    blockTypes.filter((t) => t !== 'HeroSplit' && t !== 'FooterSimple')
   );
-  const firstCtaIdx = schema.blocks.findIndex((b) => b.type === 'CTASection');
-  if (firstCtaIdx === -1 || firstContentIdx === -1 || firstCtaIdx > firstContentIdx) {
+
+  // Count non-standard blocks
+  const nonStandardCount = blockTypes.filter((t) => DIVERSITY_BLOCKS.has(t)).length;
+
+  // Distinct types score (max 10)
+  if (contentTypes.size >= 5) {
+    score += 10;
+  } else if (contentTypes.size >= 4) {
+    score += 8;
+  } else if (contentTypes.size >= 3) {
     score += 6;
   } else {
     score += 2;
-    notes.push('CTA appears before main content sections');
+    notes.push(`Only ${contentTypes.size} distinct content block types`);
   }
 
-  return { score, max: 20, notes: notes.join('; ') || 'Good visual hierarchy' };
-}
-
-function scoreContentDensity(schema: PageSchema): ScoreCategory {
-  let score = 0;
-  const notes: string[] = [];
-  const blockCount = schema.blocks.length;
-
-  if (blockCount >= 5 && blockCount <= 8) {
+  // Non-standard blocks score (max 10) — require >= 3
+  if (nonStandardCount >= 3) {
     score += 10;
-  } else if (blockCount >= 4 && blockCount <= 10) {
+  } else if (nonStandardCount >= 2) {
     score += 7;
-    notes.push(`${blockCount} blocks — slightly outside ideal range (5-8)`);
+  } else if (nonStandardCount >= 1) {
+    score += 4;
   } else {
-    score += 3;
-    notes.push(`${blockCount} blocks — too ${blockCount < 4 ? 'few' : 'many'}`);
+    notes.push('No non-standard blocks (BentoGrid, FeatureZigzag, StatsBand, ProcessTimeline)');
   }
 
-  // Block type variety (not all the same)
-  const uniqueTypes = new Set(schema.blocks.map((b) => b.type)).size;
-  if (uniqueTypes >= Math.min(blockCount, 5)) {
+  // Penalize default sequence (max 5)
+  const typeSeq = blockTypes.join(',');
+  const defaultSeq = DEFAULT_SEQUENCE.join(',');
+  if (typeSeq.includes(defaultSeq)) {
+    notes.push('Contains default SaaS template sequence — penalized');
+  } else {
     score += 5;
-  } else {
-    score += 2;
-    notes.push('Low block type variety');
   }
 
-  return { score, max: 15, notes: notes.join('; ') || 'Good content density' };
+  return { score, max: 25, notes: notes.join('; ') || 'Good layout diversity' };
 }
 
-function scoreCTAQuality(schema: PageSchema): ScoreCategory {
+function scoreSignaturePresence(schema: PageSchema, signature?: string): ScoreCategory {
   let score = 0;
   const notes: string[] = [];
 
-  // Has hero CTA (above the fold)
-  const hero = schema.blocks.find((b) => b.type === 'HeroSplit');
-  if (hero && hero.type === 'HeroSplit' && hero.ctaText) {
-    score += 8;
+  // Has a signature at all (10 pts)
+  if (signature) {
+    score += 10;
   } else {
-    notes.push('No above-the-fold CTA in hero');
+    notes.push('No style signature applied');
   }
 
-  // 1-2 CTA sections
-  const ctaCount = schema.blocks.filter((b) => b.type === 'CTASection').length;
-  if (ctaCount >= 1 && ctaCount <= 2) {
+  // Variant diversity — not all defaults (10 pts)
+  const variants = schema.blocks
+    .map((b) => ('variant' in b ? (b as Record<string, unknown>).variant : undefined))
+    .filter(Boolean) as string[];
+
+  const defaultVariants = new Set([
+    'split-left', 'cards', 'logo-bar', 'gradient-bg', 'minimal', 'classic',
+  ]);
+
+  const nonDefaultVariants = variants.filter((v) => !defaultVariants.has(v));
+  if (nonDefaultVariants.length >= 3) {
+    score += 10;
+  } else if (nonDefaultVariants.length >= 2) {
     score += 7;
-  } else if (ctaCount === 0) {
-    score += 3;
-    notes.push('No dedicated CTA section');
+  } else if (nonDefaultVariants.length >= 1) {
+    score += 4;
   } else {
-    score += 3;
-    notes.push(`${ctaCount} CTA sections — too many`);
+    notes.push('All blocks use default variants');
   }
 
-  return { score, max: 15, notes: notes.join('; ') || 'Good CTA placement' };
+  return { score, max: 20, notes: notes.join('; ') || 'Strong signature presence' };
 }
 
 function scoreTypography(tokens: ResolvedDesignTokens): ScoreCategory {
   let score = 0;
   const notes: string[] = [];
 
-  // Check if fonts are from curated list
-  const pairingIds = FONT_PAIRINGS.map((p) => p.id);
   const matchesCurated = FONT_PAIRINGS.some(
     (p) => p.heading === tokens.typography.headingFont && p.body === tokens.typography.bodyFont
   );
@@ -189,7 +225,6 @@ function scoreTypography(tokens: ResolvedDesignTokens): ScoreCategory {
   if (matchesCurated) {
     score += 10;
   } else {
-    // Check if at least individual fonts are in the list
     const allFonts = new Set(FONT_PAIRINGS.flatMap((p) => [p.heading, p.body]));
     const headingKnown = allFonts.has(tokens.typography.headingFont);
     const bodyKnown = allFonts.has(tokens.typography.bodyFont);
@@ -205,70 +240,66 @@ function scoreTypography(tokens: ResolvedDesignTokens): ScoreCategory {
   return { score, max: 10, notes: notes.join('; ') || 'Curated font pairing' };
 }
 
-function scoreColorHarmony(tokens: ResolvedDesignTokens): ScoreCategory {
+function scoreRhythmVariety(schema: PageSchema): ScoreCategory {
   let score = 0;
   const notes: string[] = [];
-  const { palette } = tokens;
 
-  // Colors should differ enough from each other
-  const primarySecondaryDist = colorDistance(palette.primary, palette.secondary);
-  if (primarySecondaryDist > 80) {
-    score += 4;
-  } else if (primarySecondaryDist > 40) {
-    score += 2;
-    notes.push('Primary and secondary are quite similar');
-  } else {
-    notes.push('Primary and secondary are nearly identical');
-  }
+  // Check if blocks alternate between different densities/styles
+  const variants = schema.blocks
+    .map((b) => ('variant' in b ? (b as Record<string, unknown>).variant : 'default'))
+    .filter(Boolean) as string[];
 
-  // Accent should stand out from primary
-  const primaryAccentDist = colorDistance(palette.primary, palette.accent);
-  if (primaryAccentDist > 60) {
+  const uniqueVariants = new Set(variants);
+
+  // Variety in variants
+  if (uniqueVariants.size >= Math.ceil(variants.length * 0.6)) {
+    score += 5;
+  } else if (uniqueVariants.size >= Math.ceil(variants.length * 0.4)) {
     score += 3;
-  } else if (primaryAccentDist > 30) {
-    score += 2;
-    notes.push('Accent could be more distinct from primary');
-  } else {
-    notes.push('Accent too similar to primary');
-  }
-
-  // Background and surface should be light (or both dark for dark themes)
-  const bgDist = colorDistance(palette.background, palette.surface);
-  if (bgDist > 5 && bgDist < 80) {
-    score += 3;
-  } else if (bgDist <= 5) {
-    score += 2;
-    notes.push('Background and surface are identical');
   } else {
     score += 1;
-    notes.push('Background and surface differ too much');
+    notes.push('Low variant diversity — sections feel repetitive');
   }
 
-  return { score, max: 10, notes: notes.join('; ') || 'Good color harmony' };
+  // Mix of visual weights — check for dense vs sparse blocks
+  const denseBlocks = new Set(['BentoGrid', 'ServicesGrid', 'FAQAccordion']);
+  const sparseBlocks = new Set(['StatsBand', 'SocialProofRow', 'CTASection']);
+  const hasDense = schema.blocks.some((b) => denseBlocks.has(b.type));
+  const hasSparse = schema.blocks.some((b) => sparseBlocks.has(b.type));
+
+  if (hasDense && hasSparse) {
+    score += 5;
+  } else if (hasDense || hasSparse) {
+    score += 3;
+  } else {
+    score += 1;
+    notes.push('No mix of dense and sparse sections');
+  }
+
+  return { score, max: 10, notes: notes.join('; ') || 'Good visual rhythm' };
 }
 
-function scoreVisualVariety(schema: PageSchema): ScoreCategory {
-  let score = 0;
+function scoreAntiTemplate(schema: PageSchema): ScoreCategory {
+  let score = 5;
   const notes: string[] = [];
+  const blockTypes = schema.blocks.map((b) => b.type);
 
-  // Check variant diversity
-  const variants = schema.blocks
-    .map((b) => ('variant' in b ? (b as Record<string, unknown>).variant : undefined))
-    .filter(Boolean);
-
-  if (variants.length === 0) {
-    // No variants yet (backward compat)
-    score += 3;
-    notes.push('No variant data — using defaults');
-  } else {
-    const uniqueVariants = new Set(variants).size;
-    if (uniqueVariants >= Math.ceil(variants.length * 0.5)) {
-      score += 5;
-    } else {
-      score += 2;
-      notes.push('Low variant diversity');
-    }
+  // Penalize: exactly the default SaaS sequence
+  const typeStr = blockTypes.join(' → ');
+  if (typeStr.includes('HeroSplit → ValueProps3 → SocialProofRow → CTASection → FooterSimple')) {
+    score -= 3;
+    notes.push('Matches forbidden default SaaS sequence');
   }
 
-  return { score, max: 5, notes: notes.join('; ') || 'Good visual variety' };
+  // Penalize: all blocks are from the "original 8" with no new types
+  const allOriginal = blockTypes.every((t) =>
+    ['HeroSplit', 'ValueProps3', 'ServicesGrid', 'SocialProofRow',
+     'TestimonialsCards', 'FAQAccordion', 'CTASection', 'FooterSimple'].includes(t)
+  );
+  if (allOriginal) {
+    score -= 2;
+    notes.push('No new block types used — still template-like');
+  }
+
+  return { score: Math.max(0, score), max: 5, notes: notes.join('; ') || 'Passes anti-template checks' };
 }

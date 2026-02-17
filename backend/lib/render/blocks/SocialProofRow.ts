@@ -68,6 +68,29 @@ export function renderSocialProofRow(block: SocialProofRowBlock, tokens: Resolve
 </section>`;
     }
 
+    case 'stats-only': {
+      const itemsHtml = block.items.map((item, i) => `
+        <div class="text-center px-6 ${i > 0 ? 'border-l' : ''}" style="border-color: ${palette.secondary}20;">
+          <div class="text-2xl lg:text-3xl font-bold" style="color: ${palette.accent}; font-family: '${typography.headingFont}', sans-serif;">
+            ${escapeHtml(item.value || item.name)}
+          </div>
+          <div class="text-sm mt-1" style="color: ${palette.textSecondary}; font-family: '${typography.bodyFont}', sans-serif;">
+            ${escapeHtml(item.value ? item.name : '')}
+          </div>
+        </div>
+      `).join('');
+
+      return `
+<section class="py-10" style="background-color: ${palette.surface}; border-top: 1px solid ${palette.secondary}18; border-bottom: 1px solid ${palette.secondary}18;">
+  <div class="max-w-5xl mx-auto px-6">
+    ${labelHtml}
+    <div class="flex flex-wrap justify-center gap-8 lg:gap-12">
+      ${itemsHtml}
+    </div>
+  </div>
+</section>`;
+    }
+
     case 'logo-bar':
     default: {
       const itemsHtml = block.items.map((item) => `
