@@ -2,7 +2,7 @@ const express = require('express');
 const { chromium } = require('playwright');
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '*').split(',');
 
@@ -92,6 +92,51 @@ app.post('/screenshot', authenticate, async (req, res) => {
   } catch (error) {
     console.error('[screenshot] Error:', error.message);
     res.status(500).json({ error: `Screenshot failed: ${error.message}` });
+  } finally {
+    if (browser) await browser.close();
+  }
+});
+
+// Screenshot from raw HTML content (for QA loop)
+app.post('/screenshot-html', authenticate, async (req, res) => {
+  const { html } = req.body;
+
+  if (!html || typeof html !== 'string') {
+    return res.status(400).json({ error: 'Missing or invalid "html" field' });
+  }
+
+  console.log(`[screenshot-html] Rendering HTML (${html.length} chars)`);
+  const startTime = Date.now();
+
+  let browser;
+  try {
+    browser = await chromium.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    });
+
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.setContent(html, { waitUntil: 'networkidle', timeout: 30000 });
+    await page.waitForTimeout(1000);
+
+    const bodyHeight = await page.evaluate(() => document.body.scrollHeight);
+    const buffer = await page.screenshot({
+      type: 'png',
+      clip: { x: 0, y: 0, width: 1440, height: Math.min(bodyHeight, 4000) },
+    });
+
+    await context.close();
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`[screenshot-html] Done in ${elapsed}s — ${buffer.length}B`);
+
+    res.json({ screenshot: buffer.toString('base64') });
+  } catch (error) {
+    console.error('[screenshot-html] Error:', error.message);
+    res.status(500).json({ error: `Screenshot-html failed: ${error.message}` });
   } finally {
     if (browser) await browser.close();
   }

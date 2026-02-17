@@ -1,8 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk';
 import {
+  PageSchemaV2,
+  PageSchemaV2Output,
   PageSchema,
   PageSchemaOutput,
-  DesignDirectionBrief,
+  LayoutPlan,
   ExtractedContent,
 } from '@/lib/catalog/schemas';
 import { BLOCK_CATALOG } from '@/lib/catalog/blocks';
@@ -23,9 +25,9 @@ function extractJson(text: string): string {
 }
 
 export async function generateBlockSchema(
-  direction: DesignDirectionBrief,
+  layoutPlan: LayoutPlan,
   content: ExtractedContent
-): Promise<PageSchema> {
+): Promise<PageSchemaV2> {
   const client = getClient();
 
   const message = await client.messages.create({
@@ -34,7 +36,7 @@ export async function generateBlockSchema(
     messages: [
       {
         role: 'user',
-        content: claudeSchemaPrompt(direction, content, BLOCK_CATALOG),
+        content: claudeSchemaPrompt(layoutPlan, content, BLOCK_CATALOG),
       },
     ],
   });
@@ -45,7 +47,7 @@ export async function generateBlockSchema(
   }
 
   const jsonStr = extractJson(textBlock.text);
-  return PageSchemaOutput.parse(JSON.parse(jsonStr));
+  return PageSchemaV2Output.parse(JSON.parse(jsonStr));
 }
 
 export async function repairSchema(

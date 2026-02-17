@@ -4,18 +4,23 @@ import { captureScreenshots } from '@/lib/ingest/screenshot';
 import { extractContent } from '@/lib/ingest/extract';
 import { analyzeDesign } from '@/lib/llm/gemini';
 import { generateBlockSchema } from '@/lib/llm/claude';
-import { validateAndAutofix } from '@/lib/rules/autofix';
+import { generateLayoutPlan } from '@/lib/llm/layoutPlan';
+import { validateAndAutofixV2 } from '@/lib/rules/autofix';
 import { generateAssets } from '@/lib/llm/recraft';
 import { renderPageHtml } from '@/lib/render/renderHtml';
+import { resolveTokens } from '@/lib/design/presets';
+import { computeDesignScore } from '@/lib/design/score';
+import { runQALoop } from '@/lib/qa/qaLoop';
 
 export const runtime = 'nodejs';
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 const RequestSchema = z.object({
   url: z.string().url().refine((u) => u.startsWith('https://'), {
     message: 'Only HTTPS URLs are supported',
   }),
   withIllustrations: z.boolean().default(false),
+  withQA: z.boolean().default(false),
 });
 
 export async function POST(req: NextRequest) {
@@ -40,22 +45,48 @@ export async function POST(req: NextRequest) {
       }
     );
 
-    // Step C: Claude — block schema generation
-    const rawSchema = await generateBlockSchema(direction, content);
+    // Step B2: Layout Plan — Gemini picks preset, fonts, block order+variants
+    const layoutPlan = await generateLayoutPlan(direction, content);
 
-    // Step D: Validate + autofix
-    const { schema, warnings } = await validateAndAutofix(rawSchema);
+    // Step C: Claude — fills content into layout plan → PageSchemaV2
+    const rawSchema = await generateBlockSchema(layoutPlan, content);
+
+    // Step D: Validate + Autofix (enhanced with deterministic fixes)
+    const { schema: validatedV2, warnings } = await validateAndAutofixV2(rawSchema);
+
+    // Step D2: Resolve tokens from preset
+    const resolvedTokens = resolveTokens(
+      validatedV2.presetId,
+      validatedV2.tokenTweaks,
+      validatedV2.fontPairingId
+    );
+    resolvedTokens.brandName = content.brandName;
+
+    // Build the legacy PageSchema for rendering
+    const pageSchema = {
+      tokens: {
+        brandName: content.brandName,
+        primaryColor: resolvedTokens.palette.primary,
+        secondaryColor: resolvedTokens.palette.secondary,
+        accentColor: resolvedTokens.palette.accent,
+        headingFont: resolvedTokens.typography.headingFont,
+        bodyFont: resolvedTokens.typography.bodyFont,
+      },
+      blocks: validatedV2.blocks,
+    };
+
+    // Step D3: Score
+    const score = computeDesignScore(pageSchema, resolvedTokens);
 
     // Step E: Optional Recraft illustrations
     if (input.withIllustrations) {
-      // Extract icon subjects from ValueProps3 block items
-      const valueBlock = schema.blocks.find((b) => b.type === 'ValueProps3');
+      const valueBlock = pageSchema.blocks.find((b) => b.type === 'ValueProps3');
       const iconSubjects = valueBlock && valueBlock.type === 'ValueProps3'
         ? valueBlock.items.map((item) => item.title)
         : [];
 
       const assets = await generateAssets(
-        schema.tokens.brandName,
+        content.brandName,
         direction.mood,
         direction.siteType,
         iconSubjects
@@ -63,10 +94,10 @@ export async function POST(req: NextRequest) {
 
       // Inject hero image
       if (assets.heroImage) {
-        const heroBlock = schema.blocks.find((b) => b.type === 'HeroSplit');
+        const heroBlock = pageSchema.blocks.find((b) => b.type === 'HeroSplit');
         if (heroBlock && heroBlock.type === 'HeroSplit') {
           (heroBlock as { imageUrl?: string }).imageUrl = assets.heroImage;
-          (heroBlock as { imageAlt?: string }).imageAlt = `${schema.tokens.brandName} hero illustration`;
+          (heroBlock as { imageAlt?: string }).imageAlt = `${content.brandName} hero illustration`;
         }
       }
 
@@ -81,12 +112,33 @@ export async function POST(req: NextRequest) {
     }
 
     // Step F: Render deterministic HTML
-    const html = renderPageHtml(schema);
+    let html = renderPageHtml(pageSchema, resolvedTokens);
+
+    // Step G: Optional QA loop (if toggle ON and score < 75)
+    let qaResult = undefined;
+    if (input.withQA && score.total < 75) {
+      const qa = await runQALoop(html, pageSchema, resolvedTokens, 1);
+      if (qa.iterated) {
+        html = qa.html;
+        qaResult = {
+          patches: qa.patches,
+          critique: qa.critique,
+        };
+      } else {
+        qaResult = {
+          patches: [],
+          critique: qa.critique,
+        };
+      }
+    }
 
     return NextResponse.json({
       html,
-      schema,
+      schema: pageSchema,
       direction,
+      layoutPlan,
+      score,
+      qaResult,
       warnings,
     });
   } catch (error) {
