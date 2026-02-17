@@ -11,10 +11,14 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 RUN npm ci
-
 RUN npx playwright install chromium
 
-COPY server.js ./
+# Copy source
+COPY tsconfig.json esbuild.mjs server.ts ./
+COPY lib/ ./lib/
+
+# Build
+RUN npm run build
 
 EXPOSE 3001
-CMD ["node", "server.js"]
+CMD ["node", "dist/server.js"]

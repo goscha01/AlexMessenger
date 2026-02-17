@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 
 interface ScoreBreakdown {
   [category: string]: {
@@ -31,23 +31,35 @@ interface PipelineResult {
   warnings: string[];
 }
 
+interface StepInfo {
+  name: string;
+  status: 'running' | 'done' | 'error' | 'skipped';
+  ms?: number;
+  error?: string;
+}
+
 type AppState =
   | { status: 'idle' }
-  | { status: 'loading'; step: string }
-  | { status: 'success'; data: PipelineResult }
-  | { status: 'error'; message: string };
-
-const STEPS = [
-  'Capturing screenshots...',
-  'Analyzing design with Gemini Vision...',
-  'Creating layout plan...',
-  'Generating content with Claude...',
-  'Validating & scoring...',
-  'Rendering preview...',
-  'Running visual QA...',
-];
+  | { status: 'loading'; steps: StepInfo[]; currentStep: string }
+  | { status: 'success'; data: PipelineResult; steps: StepInfo[] }
+  | { status: 'error'; message: string; steps: StepInfo[] };
 
 type Tab = 'preview' | 'html' | 'schema' | 'debug';
+
+const STEP_LABELS: Record<string, string> = {
+  screenshots: 'Capturing screenshots',
+  extract: 'Extracting content',
+  gemini_direction: 'Analyzing design (Gemini)',
+  layout_plan: 'Creating layout plan',
+  claude_content: 'Generating content (Claude)',
+  validate: 'Validating schema',
+  score: 'Scoring design',
+  illustrations: 'Generating illustrations (Recraft)',
+  render: 'Rendering HTML',
+  qa_loop: 'Running visual QA',
+};
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
 
 function ScoreBadge({ score }: { score: number }) {
   const color = score >= 80 ? 'bg-green-100 text-green-800' :
@@ -60,15 +72,47 @@ function ScoreBadge({ score }: { score: number }) {
   );
 }
 
+function StepList({ steps }: { steps: StepInfo[] }) {
+  return (
+    <div className="space-y-1">
+      {steps.map((step, i) => (
+        <div key={i} className="flex items-center gap-2 text-sm">
+          {step.status === 'running' && (
+            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          )}
+          {step.status === 'done' && (
+            <span className="text-green-600 w-4 text-center">+</span>
+          )}
+          {step.status === 'error' && (
+            <span className="text-red-600 w-4 text-center">x</span>
+          )}
+          {step.status === 'skipped' && (
+            <span className="text-gray-400 w-4 text-center">-</span>
+          )}
+          <span className={step.status === 'error' ? 'text-red-700' : 'text-gray-700'}>
+            {STEP_LABELS[step.name] || step.name}
+          </span>
+          {step.ms !== undefined && (
+            <span className="text-gray-400 text-xs">{(step.ms / 1000).toFixed(1)}s</span>
+          )}
+          {step.error && (
+            <span className="text-red-500 text-xs">{step.error}</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function Home() {
   const [url, setUrl] = useState('');
   const [withIllustrations, setWithIllustrations] = useState(false);
   const [withQA, setWithQA] = useState(false);
   const [state, setState] = useState<AppState>({ status: 'idle' });
   const [activeTab, setActiveTab] = useState<Tab>('preview');
-  const stepInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  async function handleRedesign() {
+  const handleRedesign = useCallback(async () => {
     if (!url.trim()) return;
 
     let targetUrl = url.trim();
@@ -76,53 +120,106 @@ export default function Home() {
       targetUrl = `https://${targetUrl}`;
     }
 
-    setState({ status: 'loading', step: STEPS[0] });
-
-    let stepIndex = 0;
-    stepInterval.current = setInterval(() => {
-      stepIndex = Math.min(stepIndex + 1, STEPS.length - 1);
-      setState((prev) =>
-        prev.status === 'loading' ? { status: 'loading', step: STEPS[stepIndex] } : prev
-      );
-    }, 8000);
+    abortRef.current = new AbortController();
+    setState({ status: 'loading', steps: [], currentStep: 'Starting...' });
 
     try {
-      const response = await fetch('/api/redesign', {
+      const response = await fetch(`${BACKEND_URL}/redesign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: targetUrl, withIllustrations, withQA }),
+        signal: abortRef.current.signal,
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || data.details?.join(', ') || `Request failed (${response.status})`);
+        const errorData = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(errorData.error || `Request failed (${response.status})`);
       }
 
-      setState({ status: 'success', data });
-      setActiveTab('preview');
+      if (!response.body) {
+        throw new Error('No response body — streaming not supported');
+      }
+
+      // Read NDJSON stream
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      const steps: StepInfo[] = [];
+      let result: PipelineResult | null = null;
+      let pipelineError: string | null = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const event = JSON.parse(line);
+
+            if (event.step === 'complete') {
+              result = event.result;
+            } else if (event.step === 'error') {
+              pipelineError = event.error;
+            } else {
+              // Update step tracking
+              const existing = steps.find((s) => s.name === event.step);
+              if (existing) {
+                existing.status = event.status;
+                existing.ms = event.ms;
+                existing.error = event.error;
+              } else {
+                steps.push({
+                  name: event.step,
+                  status: event.status,
+                  ms: event.ms,
+                  error: event.error,
+                });
+              }
+
+              setState({
+                status: 'loading',
+                steps: [...steps],
+                currentStep: STEP_LABELS[event.step] || event.step,
+              });
+            }
+          } catch {
+            // Skip unparseable lines
+          }
+        }
+      }
+
+      if (result) {
+        setState({ status: 'success', data: result, steps: [...steps] });
+        setActiveTab('preview');
+      } else if (pipelineError) {
+        setState({ status: 'error', message: pipelineError, steps: [...steps] });
+      } else {
+        setState({ status: 'error', message: 'Pipeline ended without result', steps: [...steps] });
+      }
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
       setState({
         status: 'error',
         message: error instanceof Error ? error.message : 'Something went wrong',
+        steps: [],
       });
-    } finally {
-      if (stepInterval.current) {
-        clearInterval(stepInterval.current);
-        stepInterval.current = null;
-      }
     }
-  }
+  }, [url, withIllustrations, withQA]);
 
   function handleDownload() {
     if (state.status !== 'success') return;
     const blob = new Blob([state.data.html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
+    const dl = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
+    a.href = dl;
     a.download = 'redesign.html';
     a.click();
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(dl);
   }
 
   function handleCopyHtml() {
@@ -136,7 +233,7 @@ export default function Home() {
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <h1 className="text-xl font-bold text-gray-900">AI Website Redesign</h1>
-          <span className="text-xs text-gray-400">POC v2.0</span>
+          <span className="text-xs text-gray-400">POC v2.1 — Railway backend</span>
         </div>
       </header>
 
@@ -188,18 +285,26 @@ export default function Home() {
 
         {/* Loading State */}
         {state.status === 'loading' && (
-          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center mb-6">
-            <div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-gray-700 font-medium">{state.step}</p>
-            <p className="text-gray-400 text-sm mt-2">This usually takes 30-120 seconds</p>
+          <div className="bg-white rounded-xl border border-gray-200 p-8 mb-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-6 h-6 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+              <p className="text-gray-700 font-medium">{state.currentStep}</p>
+            </div>
+            <StepList steps={state.steps} />
           </div>
         )}
 
         {/* Error State */}
         {state.status === 'error' && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-6 mb-6">
-            <p className="text-red-800 font-medium">Error</p>
+            <p className="text-red-800 font-medium">Pipeline Error</p>
             <p className="text-red-600 mt-1">{state.message}</p>
+            {state.steps.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-red-200">
+                <p className="text-sm font-medium text-red-700 mb-2">Steps completed before failure:</p>
+                <StepList steps={state.steps} />
+              </div>
+            )}
           </div>
         )}
 
@@ -282,6 +387,12 @@ export default function Home() {
               {/* Debug Tab */}
               {activeTab === 'debug' && (
                 <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto panel-scroll">
+                  {/* Pipeline Steps */}
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-2">Pipeline Steps</h3>
+                    <StepList steps={state.steps} />
+                  </div>
+
                   {/* Warnings */}
                   {state.data.warnings.length > 0 && (
                     <div>

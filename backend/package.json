@@ -1,13 +1,25 @@
 {
-  "name": "ai-redesign-screenshot-service",
-  "version": "1.0.0",
+  "name": "ai-redesign-backend",
+  "version": "2.0.0",
   "private": true,
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "build": "node esbuild.mjs",
+    "start": "node dist/server.js",
+    "dev": "npx tsx server.ts"
   },
   "dependencies": {
     "express": "^4.21.0",
-    "playwright": "^1.50.0"
+    "playwright": "^1.50.0",
+    "zod": "^3.24.0",
+    "cheerio": "^1.0.0",
+    "@google/generative-ai": "^0.24.0",
+    "@anthropic-ai/sdk": "^0.39.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "esbuild": "^0.24.0",
+    "tsx": "^4.0.0",
+    "@types/node": "^20",
+    "@types/express": "^5"
   }
 }
