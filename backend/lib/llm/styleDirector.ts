@@ -36,7 +36,12 @@ export async function generateStyleSpec(
 
   const result = await model.generateContent([{ text: prompt }]);
   const text = result.response.text();
-  const json = JSON.parse(text);
+  let json = JSON.parse(text);
+
+  // Gemini sometimes wraps the response in an array
+  if (Array.isArray(json)) {
+    json = json[0];
+  }
 
   return StyleSpecSchema.parse(json);
 }

@@ -36,7 +36,8 @@ export async function observeDesign(
   ]);
 
   const text = result.response.text();
-  const json = JSON.parse(text);
+  let json = JSON.parse(text);
+  if (Array.isArray(json)) json = json[0];
   return GeminiObservationsSchema.parse(json);
 }
 
