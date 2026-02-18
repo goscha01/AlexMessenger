@@ -12,6 +12,12 @@ import { renderBentoGrid } from './blocks/BentoGrid';
 import { renderFeatureZigzag } from './blocks/FeatureZigzag';
 import { renderStatsBand } from './blocks/StatsBand';
 import { renderProcessTimeline } from './blocks/ProcessTimeline';
+import { renderHeroTerminal } from './blocks/HeroTerminal';
+import { renderHeroChart } from './blocks/HeroChart';
+import { renderDataVizBand } from './blocks/DataVizBand';
+import { renderDataTable } from './blocks/DataTable';
+import { renderComparisonTable } from './blocks/ComparisonTable';
+import { renderSectionKicker } from './blocks/SectionKicker';
 import { getSignatureCSS, getSignatureStyles } from '@/lib/design/signatures';
 
 // HTML entity escaping for XSS prevention
@@ -42,6 +48,12 @@ const BLOCK_RENDERERS: Record<string, BlockRenderer> = {
   FeatureZigzag: renderFeatureZigzag as BlockRenderer,
   StatsBand: renderStatsBand as BlockRenderer,
   ProcessTimeline: renderProcessTimeline as BlockRenderer,
+  HeroTerminal: renderHeroTerminal as BlockRenderer,
+  HeroChart: renderHeroChart as BlockRenderer,
+  DataVizBand: renderDataVizBand as BlockRenderer,
+  DataTable: renderDataTable as BlockRenderer,
+  ComparisonTable: renderComparisonTable as BlockRenderer,
+  SectionKicker: renderSectionKicker as BlockRenderer,
 };
 
 // ─── Render Manifest ────────────────────────────────────────────────────────────
@@ -267,18 +279,27 @@ function getSignatureEnhancements(signature?: string, tokens?: ResolvedDesignTok
   switch (signature) {
     case 'technicalGrid':
       return `
-    /* Technical Grid: subtle grid background, monospace labels, fine lines */
-    body { background-image: linear-gradient(rgba(0,0,0,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.025) 1px, transparent 1px); background-size: 40px 40px; }
+    /* Technical Grid: dark mode enforced, grid canvas, mono labels, thin rules */
+    body {
+      background-color: var(--color-background) !important;
+      background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px) !important;
+      background-size: 40px 40px !important;
+      color: var(--color-text-primary) !important;
+    }
+    h1, h2, h3, h4 { color: #ffffff !important; }
+    p, li, td, th, span, label { color: var(--color-text-primary) !important; }
+    section { background: transparent !important; border-bottom: 1px solid rgba(255,255,255,0.06); }
     [data-block-type] { position: relative; }
     .sig-techgrid [data-block-type]::before {
       content: attr(data-block-type) ' / ' attr(data-variant);
       position: absolute; top: 8px; right: 12px;
-      font-family: monospace; font-size: 10px; text-transform: uppercase;
-      color: rgba(0,0,0,0.15); letter-spacing: 0.05em; pointer-events: none;
+      font-family: 'Space Grotesk', monospace; font-size: 10px; text-transform: uppercase;
+      color: rgba(255,255,255,0.15); letter-spacing: 0.05em; pointer-events: none; z-index: 1;
     }
-    .sig-techgrid section { border-bottom: 1px solid rgba(0,0,0,0.06); }
     .sig-techgrid h2 { letter-spacing: -0.01em; }
-    .sig-techgrid .block-card { border: 1px solid rgba(0,0,0,0.08); border-radius: 4px; }
+    .sig-techgrid .block-card { border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; background: rgba(255,255,255,0.02) !important; }
+    .sig-techgrid a[href] { color: ${accent}; text-shadow: 0 0 8px ${accent}30; }
+    [data-block-type="StatsBand"] { border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06); }
       `;
 
     case 'darkNeon':
@@ -343,4 +364,114 @@ function getSignatureEnhancements(signature?: string, tokens?: ResolvedDesignTok
     default:
       return '';
   }
+}
+
+// ─── Preview Renderer ────────────────────────────────────────────────────────────
+
+/**
+ * Lightweight renderer for 4-block preview thumbnails.
+ * Same rendering as renderPageHtml but:
+ * - No manifest embedding
+ * - No version tag
+ * - Smaller max-width container (800px)
+ * - Still includes signature CSS + Google Fonts
+ */
+export function renderPreviewHtml(
+  blocks: Block[],
+  resolvedTokens: ResolvedDesignTokens,
+  signature?: string,
+  density?: string,
+): string {
+  const t = resolvedTokens;
+  const sig = signature ? getSignatureStyles(signature) : null;
+  const sigCSS = signature ? getSignatureCSS(signature) : '';
+  const wrapperClass = sig ? sig.sectionClass : '';
+  const densityPad = getDensityPadding(density);
+  const separator = getSeparatorHtml(signature);
+  const signatureEnhancements = getSignatureEnhancements(signature, t);
+
+  const blockHtmlParts = blocks.map((block: Block, index: number) => {
+    const renderer = BLOCK_RENDERERS[block.type];
+    const variant = ('variant' in block ? (block as Record<string, unknown>).variant as string : 'default') || 'default';
+
+    if (!renderer) {
+      return `<section style="background:#fee2e2;padding:2rem;text-align:center;color:#991b1b;font-family:monospace;">
+  <strong>RENDER ERROR:</strong> Unknown block type "${escapeHtml(block.type)}"
+</section>`;
+    }
+
+    let rendered = renderer(block as never, t);
+
+    // Inject data attributes
+    const tagMatch = rendered.match(/^(\s*<(?:section|footer))([ >])/);
+    if (tagMatch) {
+      const attrs = ` data-block-type="${escapeHtml(block.type)}" data-variant="${escapeHtml(variant)}" data-block-index="${index}"`;
+      rendered = rendered.replace(tagMatch[0], `${tagMatch[1]}${attrs}${tagMatch[2]}`);
+    }
+
+    return rendered;
+  });
+
+  const blockHtml = blockHtmlParts.join(separator ? `\n${separator}\n` : '\n');
+
+  const headingFont = encodeURIComponent(t.typography.headingFont);
+  const bodyFont = encodeURIComponent(t.typography.bodyFont);
+  const fontsParam = headingFont === bodyFont
+    ? `family=${headingFont}:wght@400;500;600;700`
+    : `family=${headingFont}:wght@400;500;600;700&family=${bodyFont}:wght@400;500;600;700`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Preview — ${escapeHtml(t.brandName)}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?${fontsParam}&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --color-primary: ${t.palette.primary};
+      --color-secondary: ${t.palette.secondary};
+      --color-accent: ${t.palette.accent};
+      --color-background: ${t.palette.background};
+      --color-surface: ${t.palette.surface};
+      --color-text-primary: ${t.palette.textPrimary};
+      --color-text-secondary: ${t.palette.textSecondary};
+      --font-heading: '${t.typography.headingFont}', system-ui, sans-serif;
+      --font-body: '${t.typography.bodyFont}', system-ui, sans-serif;
+      --radius: ${t.borderRadius};
+      --primary: ${t.palette.primary};
+      --accent: ${t.palette.accent};
+      --background: ${t.palette.background};
+      --surface: ${t.palette.surface};
+      --density-section-padding: ${densityPad.sectionPx};
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--font-body);
+      color: var(--color-text-primary);
+      background-color: var(--color-background);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); }
+    details summary { list-style: none; }
+    details summary::-webkit-details-marker { display: none; }
+    a:focus-visible, button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+    a[href]:not(.no-hover):hover { opacity: 0.9; transition: opacity 0.15s ease; }
+    /* Preview container constraint */
+    .preview-wrapper > section, .preview-wrapper > footer { max-width: 800px; margin-left: auto; margin-right: auto; }
+    ${sigCSS}
+    ${signatureEnhancements}
+  </style>
+</head>
+<body data-signature="${escapeHtml(signature || 'none')}" data-density="${escapeHtml(density || 'normal')}">
+<div class="${wrapperClass} preview-wrapper">
+${blockHtml}
+</div>
+</body>
+</html>`;
 }

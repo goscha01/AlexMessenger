@@ -61,11 +61,18 @@ export const BlockTypeEnum = z.enum([
   'FAQAccordion',
   'CTASection',
   'FooterSimple',
-  // New blocks
+  // Diversity blocks
   'BentoGrid',
   'FeatureZigzag',
   'StatsBand',
   'ProcessTimeline',
+  // Signature artifact blocks
+  'HeroTerminal',
+  'HeroChart',
+  'DataVizBand',
+  'DataTable',
+  'ComparisonTable',
+  'SectionKicker',
 ]);
 
 // ===== Variant Enums (expanded) =====
@@ -96,6 +103,14 @@ export const BentoGridVariant = z.enum(['2x2', '3-col', 'mixed']).default('mixed
 export const FeatureZigzagVariant = z.enum(['standard', 'with-image', 'numbered']).default('standard');
 export const StatsBandVariant = z.enum(['dark', 'accent', 'minimal']).default('accent');
 export const ProcessTimelineVariant = z.enum(['vertical', 'horizontal', 'cards']).default('vertical');
+
+// Signature artifact block variants
+export const HeroTerminalVariant = z.enum(['dark', 'matrix', 'retro']).default('dark');
+export const HeroChartVariant = z.enum(['line-chart', 'bar-chart', 'area-chart']).default('line-chart');
+export const DataVizBandVariant = z.enum(['sparklines', 'progress-bars', 'gauge']).default('sparklines');
+export const DataTableVariant = z.enum(['striped', 'bordered', 'minimal']).default('striped');
+export const ComparisonTableVariant = z.enum(['vs', 'tiers', 'checklist']).default('vs');
+export const SectionKickerVariant = z.enum(['label-line', 'counter', 'icon-rule']).default('label-line');
 
 // ===== Individual Block Schemas =====
 export const HeroSplitSchema = z.object({
@@ -225,6 +240,70 @@ export const ProcessTimelineSchema = z.object({
   })).min(3).max(6),
 });
 
+// ===== Signature Artifact Block Schemas =====
+export const HeroTerminalSchema = z.object({
+  type: z.literal('HeroTerminal'),
+  variant: HeroTerminalVariant,
+  headline: z.string().min(1).max(200),
+  subheadline: z.string().max(300),
+  ctaText: z.string().max(60),
+  ctaHref: z.string(),
+  commandLines: z.array(z.string()).min(1).max(6),
+});
+
+export const HeroChartSchema = z.object({
+  type: z.literal('HeroChart'),
+  variant: HeroChartVariant,
+  headline: z.string().min(1).max(200),
+  subheadline: z.string().max(300),
+  ctaText: z.string().max(60),
+  ctaHref: z.string(),
+  chartData: z.array(z.object({
+    label: z.string(),
+    value: z.number(),
+  })).min(3).max(8),
+});
+
+export const DataVizBandSchema = z.object({
+  type: z.literal('DataVizBand'),
+  variant: DataVizBandVariant,
+  sectionTitle: z.string().optional(),
+  items: z.array(z.object({
+    label: z.string(),
+    value: z.string(),
+    trend: z.enum(['up', 'down', 'flat']).optional(),
+  })).min(3).max(6),
+});
+
+export const DataTableSchema = z.object({
+  type: z.literal('DataTable'),
+  variant: DataTableVariant,
+  sectionTitle: z.string(),
+  columns: z.array(z.string()).min(2).max(6),
+  rows: z.array(z.array(z.string())).min(2).max(8),
+});
+
+export const ComparisonTableSchema = z.object({
+  type: z.literal('ComparisonTable'),
+  variant: ComparisonTableVariant,
+  sectionTitle: z.string(),
+  columns: z.array(z.object({
+    name: z.string(),
+    highlighted: z.boolean().optional(),
+  })).min(2).max(4),
+  rows: z.array(z.object({
+    feature: z.string(),
+    values: z.array(z.string()),
+  })).min(3).max(10),
+});
+
+export const SectionKickerSchema = z.object({
+  type: z.literal('SectionKicker'),
+  variant: SectionKickerVariant,
+  label: z.string(),
+  sublabel: z.string().optional(),
+});
+
 // ===== Discriminated Union of All Blocks =====
 export const BlockSchema = z.discriminatedUnion('type', [
   HeroSplitSchema,
@@ -235,11 +314,18 @@ export const BlockSchema = z.discriminatedUnion('type', [
   FAQAccordionSchema,
   CTASectionSchema,
   FooterSimpleSchema,
-  // New blocks
+  // Diversity blocks
   BentoGridSchema,
   FeatureZigzagSchema,
   StatsBandSchema,
   ProcessTimelineSchema,
+  // Signature artifact blocks
+  HeroTerminalSchema,
+  HeroChartSchema,
+  DataVizBandSchema,
+  DataTableSchema,
+  ComparisonTableSchema,
+  SectionKickerSchema,
 ]);
 
 // ===== Design Tokens (legacy — used for rendering) =====
@@ -323,6 +409,87 @@ export const QAPatchV2Schema = z.object({
 export const QAPatchItemSchema = QAPatchV2ItemSchema;
 export const QAPatchSchema = QAPatchV2Schema;
 
+// ===== Layout DNA Schema =====
+
+export const LayoutDNASchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  description: z.string(),
+  heroType: z.string(),
+  heroVariant: z.string(),
+  requiredBlocks: z.array(z.string()),
+  requiredPatterns: z.array(z.string()),
+  forbiddenBlocks: z.array(z.string()),
+  blockCount: z.object({ min: z.number(), max: z.number() }),
+  structureHint: z.string(),
+});
+
+export const NoveltyLocksSchema = z.object({
+  heroTypeLocked: z.string(),
+  heroVariantLocked: z.string(),
+  requiredBlockTypes: z.array(z.string()),
+  lockedVariants: z.array(z.object({ blockIndex: z.number(), variant: z.string() })),
+});
+
+// ===== Style Library V3 Schemas =====
+
+// Template A output — 3 style selections
+export const StyleSelectionItemSchema = z.object({
+  styleId: z.string(),
+  confidence: z.number().min(0).max(1),
+  reason: z.string(),
+  bestFor: z.string(),
+});
+export const StyleSelectionSchema = z.array(StyleSelectionItemSchema).length(3);
+
+// Template B output — preview schema (4 blocks)
+export const PreviewBlockSchema = z.object({
+  type: z.string(),
+  variant: z.string(),
+  props: z.record(z.unknown()),
+});
+export const PreviewSchemaOutput = z.object({
+  styleId: z.string(),
+  presetTokens: z.record(z.unknown()),
+  typography: z.object({ pairingId: z.string(), scaleId: z.string() }),
+  blocks: z.array(PreviewBlockSchema).min(3).max(5),
+});
+
+// Template C output — layout plan
+export const LayoutPlanV3Schema = z.object({
+  styleId: z.string(),
+  sectionWrappers: z.array(z.object({ index: z.number(), wrapper: z.string() })),
+  layoutPatterns: z.array(z.string()).min(3),
+  blocks: z.array(z.object({ type: z.string(), variant: z.string(), rationale: z.string() })),
+  ctaStrategy: z.object({ primaryPlacement: z.string(), secondaryAllowed: z.boolean() }),
+});
+
+// Template D output — final page schema
+export const FinalPageSchemaOutput = z.object({
+  styleId: z.string(),
+  tokens: z.record(z.unknown()),
+  sectionWrappers: z.array(z.object({ index: z.number(), wrapper: z.string() })),
+  blocks: z.array(z.object({ type: z.string(), variant: z.string(), props: z.record(z.unknown()) })),
+  signatureFlags: z.object({
+    backgroundMotif: z.array(z.string()),
+    separators: z.array(z.string()),
+    microElements: z.array(z.string()),
+  }),
+  noveltyLocks: NoveltyLocksSchema.optional(),
+});
+
+// Direction response for API
+export const DirectionSchema = z.object({
+  id: z.enum(['A', 'B', 'C']),
+  styleId: z.string(),
+  styleLabel: z.string(),
+  confidence: z.number(),
+  reason: z.string(),
+  bestFor: z.string(),
+  previewHtml: z.string(),
+  previewScreenshot: z.string(),
+});
+
 // ===== TypeScript types =====
 export type ExtractedContent = z.infer<typeof ExtractedContentSchema>;
 export type GeminiObservations = z.infer<typeof GeminiObservationsSchema>;
@@ -341,6 +508,16 @@ export type QAPatch = QAPatchV2;
 export type QAPatchItem = QAPatchV2Item;
 export type TokenTweaks = z.infer<typeof TokenTweaksSchema>;
 export type BlockType = z.infer<typeof BlockTypeEnum>;
+export type StyleSelectionItem = z.infer<typeof StyleSelectionItemSchema>;
+export type StyleSelection = z.infer<typeof StyleSelectionSchema>;
+export type PreviewBlock = z.infer<typeof PreviewBlockSchema>;
+export type PreviewSchema = z.infer<typeof PreviewSchemaOutput>;
+export type LayoutPlanV3 = z.infer<typeof LayoutPlanV3Schema>;
+export type FinalPageSchema = z.infer<typeof FinalPageSchemaOutput>;
+export type Direction = z.infer<typeof DirectionSchema>;
+
+export type LayoutDNA = z.infer<typeof LayoutDNASchema>;
+export type NoveltyLocks = z.infer<typeof NoveltyLocksSchema>;
 
 // Legacy alias
 export type DesignDirectionBrief = GeminiObservations;

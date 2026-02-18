@@ -1,5 +1,5 @@
 import type { ResolvedDesignTokens } from './types';
-import type { PageSchema } from '@/lib/catalog/schemas';
+import type { PageSchema, LayoutDNA } from '@/lib/catalog/schemas';
 import { contrastRatio, colorDistance } from './colorUtils';
 import { FONT_PAIRINGS } from './fonts';
 
@@ -21,35 +21,43 @@ const DEFAULT_SEQUENCE = ['HeroSplit', 'ValueProps3', 'SocialProofRow', 'CTASect
 // Non-standard block types that indicate layout diversity
 const DIVERSITY_BLOCKS = new Set([
   'BentoGrid', 'FeatureZigzag', 'StatsBand', 'ProcessTimeline',
+  'HeroTerminal', 'HeroChart', 'DataVizBand', 'DataTable', 'ComparisonTable', 'SectionKicker',
 ]);
 
 export function computeDesignScore(
   schema: PageSchema,
   tokens: ResolvedDesignTokens,
-  signature?: string
+  signature?: string,
+  dna?: LayoutDNA,
 ): DesignScoreResult {
   const breakdown: Record<string, ScoreCategory> = {};
 
-  // Contrast (20 pts)
+  // Contrast (15 pts)
   breakdown.contrast = scoreContrast(tokens);
 
   // Hierarchy (10 pts)
   breakdown.hierarchy = scoreHierarchy(schema);
 
-  // Layout Diversity (25 pts) — the big one
+  // Layout Diversity (20 pts)
   breakdown.layoutDiversity = scoreLayoutDiversity(schema);
 
-  // Signature Presence (20 pts)
+  // Signature Presence (15 pts)
   breakdown.signaturePresence = scoreSignaturePresence(schema, signature);
 
-  // Typography (10 pts)
+  // Typography (8 pts)
   breakdown.typography = scoreTypography(tokens);
 
-  // Rhythm Variety (10 pts)
+  // Rhythm Variety (7 pts)
   breakdown.rhythmVariety = scoreRhythmVariety(schema);
 
   // Anti-Template (5 pts)
   breakdown.antiTemplate = scoreAntiTemplate(schema);
+
+  // Hero Novelty (10 pts)
+  breakdown.heroNovelty = scoreHeroNovelty(schema, dna);
+
+  // DNA Compliance (10 pts)
+  breakdown.dnaCompliance = scoreDnaCompliance(schema, dna);
 
   const total = Object.values(breakdown).reduce((sum, cat) => sum + cat.score, 0);
   const hasSignatureBlocks = schema.blocks.some((b) => DIVERSITY_BLOCKS.has(b.type));
@@ -98,15 +106,16 @@ function scoreContrast(tokens: ResolvedDesignTokens): ScoreCategory {
     notes.push('Button text contrast fails');
   }
 
-  return { score, max: 20, notes: notes.join('; ') || 'All contrast checks pass' };
+  return { score: Math.min(score, 15), max: 15, notes: notes.join('; ') || 'All contrast checks pass' };
 }
 
 function scoreHierarchy(schema: PageSchema): ScoreCategory {
   let score = 0;
   const notes: string[] = [];
 
-  // Hero first
-  if (schema.blocks[0]?.type === 'HeroSplit') {
+  // Hero first (any hero type)
+  const HERO_TYPES = new Set(['HeroSplit', 'HeroTerminal', 'HeroChart']);
+  if (HERO_TYPES.has(schema.blocks[0]?.type)) {
     score += 4;
   } else {
     notes.push('Hero is not the first block');
@@ -121,7 +130,7 @@ function scoreHierarchy(schema: PageSchema): ScoreCategory {
 
   // CTA present — check for dedicated CTA block OR CTA in hero
   const hasCTABlock = schema.blocks.some((b) => b.type === 'CTASection');
-  const heroBlock = schema.blocks.find((b) => b.type === 'HeroSplit');
+  const heroBlock = schema.blocks.find((b) => HERO_TYPES.has(b.type));
   const heroCTA = heroBlock && 'ctaText' in heroBlock && (heroBlock as Record<string, unknown>).ctaText;
   if (hasCTABlock) {
     score += 3;
@@ -182,7 +191,7 @@ function scoreLayoutDiversity(schema: PageSchema): ScoreCategory {
     score += 5;
   }
 
-  return { score, max: 25, notes: notes.join('; ') || 'Good layout diversity' };
+  return { score: Math.min(score, 20), max: 20, notes: notes.join('; ') || 'Good layout diversity' };
 }
 
 function scoreSignaturePresence(schema: PageSchema, signature?: string): ScoreCategory {
@@ -216,7 +225,7 @@ function scoreSignaturePresence(schema: PageSchema, signature?: string): ScoreCa
     notes.push('All blocks use default variants');
   }
 
-  return { score, max: 20, notes: notes.join('; ') || 'Strong signature presence' };
+  return { score: Math.min(score, 15), max: 15, notes: notes.join('; ') || 'Strong signature presence' };
 }
 
 function scoreTypography(tokens: ResolvedDesignTokens): ScoreCategory {
@@ -242,7 +251,7 @@ function scoreTypography(tokens: ResolvedDesignTokens): ScoreCategory {
     }
   }
 
-  return { score, max: 10, notes: notes.join('; ') || 'Curated font pairing' };
+  return { score: Math.min(score, 8), max: 8, notes: notes.join('; ') || 'Curated font pairing' };
 }
 
 function scoreRhythmVariety(schema: PageSchema): ScoreCategory {
@@ -281,7 +290,7 @@ function scoreRhythmVariety(schema: PageSchema): ScoreCategory {
     notes.push('No mix of dense and sparse sections');
   }
 
-  return { score, max: 10, notes: notes.join('; ') || 'Good visual rhythm' };
+  return { score: Math.min(score, 7), max: 7, notes: notes.join('; ') || 'Good visual rhythm' };
 }
 
 function scoreAntiTemplate(schema: PageSchema): ScoreCategory {
@@ -307,4 +316,78 @@ function scoreAntiTemplate(schema: PageSchema): ScoreCategory {
   }
 
   return { score: Math.max(0, score), max: 5, notes: notes.join('; ') || 'Passes anti-template checks' };
+}
+
+function scoreHeroNovelty(schema: PageSchema, dna?: LayoutDNA): ScoreCategory {
+  let score = 0;
+  const notes: string[] = [];
+  const heroBlock = schema.blocks[0] as Record<string, unknown> | undefined;
+
+  if (!heroBlock) {
+    return { score: 0, max: 10, notes: 'No hero block found' };
+  }
+
+  const heroType = heroBlock.type as string;
+  const heroVariant = heroBlock.variant as string;
+
+  // +5 if hero is NOT the generic split-left or split-right
+  const genericVariants = new Set(['split-left', 'split-right']);
+  if (!genericVariants.has(heroVariant)) {
+    score += 5;
+  } else {
+    notes.push('Hero uses generic split-left/split-right variant');
+  }
+
+  // +5 if hero uses a non-standard type (HeroTerminal, HeroChart)
+  const novelHeroTypes = new Set(['HeroTerminal', 'HeroChart']);
+  if (novelHeroTypes.has(heroType)) {
+    score += 5;
+  } else if (heroType === 'HeroSplit' && !genericVariants.has(heroVariant)) {
+    // HeroSplit with non-generic variant gets partial credit
+    score += 2;
+  }
+
+  // If DNA is specified and hero matches, full points
+  if (dna && heroType === dna.heroType && heroVariant === dna.heroVariant) {
+    score = 10;
+    notes.length = 0; // Clear any notes
+  }
+
+  return { score: Math.min(score, 10), max: 10, notes: notes.join('; ') || 'Novel hero choice' };
+}
+
+function scoreDnaCompliance(schema: PageSchema, dna?: LayoutDNA): ScoreCategory {
+  if (!dna) {
+    return { score: 5, max: 10, notes: 'No DNA specified — partial credit' };
+  }
+
+  let score = 0;
+  const notes: string[] = [];
+  const blockTypes = schema.blocks.map((b) => b.type);
+
+  // +5 if all required blocks are present
+  const missingRequired = dna.requiredBlocks.filter((rb) => !blockTypes.includes(rb));
+  if (missingRequired.length === 0) {
+    score += 5;
+  } else {
+    notes.push(`Missing required blocks: ${missingRequired.join(', ')}`);
+  }
+
+  // +3 if no forbidden blocks are present
+  const presentForbidden = dna.forbiddenBlocks.filter((fb) => blockTypes.includes(fb));
+  if (presentForbidden.length === 0) {
+    score += 3;
+  } else {
+    notes.push(`Forbidden blocks present: ${presentForbidden.join(', ')}`);
+  }
+
+  // +2 if hero type matches DNA
+  const heroType = (schema.blocks[0] as Record<string, unknown>)?.type;
+  if (heroType === dna.heroType) {
+    score += 2;
+  } else {
+    notes.push(`Hero type ${heroType} doesn't match DNA (${dna.heroType})`);
+  }
+
+  return { score, max: 10, notes: notes.join('; ') || 'Full DNA compliance' };
 }

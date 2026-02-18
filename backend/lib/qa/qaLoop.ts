@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { PageSchema, QAPatchV2, QAPatchV2Schema, QAPatchV2Item } from '@/lib/catalog/schemas';
+import { PageSchema, QAPatchV2, QAPatchV2Schema, QAPatchV2Item, NoveltyLocks } from '@/lib/catalog/schemas';
 import type { ResolvedDesignTokens } from '@/lib/design/types';
 import { screenshotHtml } from '@/lib/ingest/screenshotHtml';
 import { renderPageHtml } from '@/lib/render/renderHtml';
@@ -23,6 +23,7 @@ export async function runQALoop(
   maxIterations: number = 1,
   signature?: string,
   density?: string,
+  noveltyLocks?: NoveltyLocks,
 ): Promise<QAResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -53,7 +54,7 @@ export async function runQALoop(
       });
 
       const result = await model.generateContent([
-        { text: geminiQACritiquePrompt() },
+        { text: geminiQACritiquePrompt(noveltyLocks) },
         {
           inlineData: {
             mimeType: 'image/png',
@@ -94,7 +95,7 @@ export async function runQALoop(
       }
 
       // 3. Apply patches
-      const { schema: patched, appliedCount, diff } = applyPatches(currentSchema, parsed.patches);
+      const { schema: patched, appliedCount, diff } = applyPatches(currentSchema, parsed.patches, noveltyLocks);
       console.log(`[qa]   Applied: ${appliedCount}/${parsed.patches.length} patches`);
       allDiff.push(...diff);
 

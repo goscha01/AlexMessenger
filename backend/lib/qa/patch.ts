@@ -1,4 +1,4 @@
-import { PageSchema, PageSchemaOutput, QAPatchV2Item } from '@/lib/catalog/schemas';
+import { PageSchema, PageSchemaOutput, QAPatchV2Item, NoveltyLocks } from '@/lib/catalog/schemas';
 import { BLOCK_CATALOG } from '@/lib/catalog/blocks';
 
 const DEFAULT_VARIANTS: Record<string, string> = {};
@@ -8,7 +8,8 @@ for (const b of BLOCK_CATALOG) {
 
 export function applyPatches(
   schema: PageSchema,
-  patches: QAPatchV2Item[]
+  patches: QAPatchV2Item[],
+  noveltyLocks?: NoveltyLocks,
 ): { schema: PageSchema; appliedCount: number; diff: string[] } {
   if (patches.length === 0) {
     return { schema, appliedCount: 0, diff: [] };
@@ -27,6 +28,31 @@ export function applyPatches(
 
   for (const patch of sorted) {
     try {
+      // --- Novelty lock enforcement ---
+      if (noveltyLocks) {
+        // Block swap-variant on hero (index 0) if hero is locked
+        if (patch.action === 'swap-variant' && patch.blockIndex === 0) {
+          diff.push(`[locked] swap-variant blocked on hero (locked: ${noveltyLocks.heroTypeLocked}/${noveltyLocks.heroVariantLocked})`);
+          continue;
+        }
+        // Block swap-variant on any locked variant index
+        if (patch.action === 'swap-variant') {
+          const isLocked = noveltyLocks.lockedVariants.some(lv => lv.blockIndex === patch.blockIndex);
+          if (isLocked) {
+            diff.push(`[locked] swap-variant blocked on block[${patch.blockIndex}] (variant locked)`);
+            continue;
+          }
+        }
+        // Block remove on required block types
+        if (patch.action === 'remove' && patch.blockIndex >= 0 && patch.blockIndex < cloned.blocks.length) {
+          const targetType = cloned.blocks[patch.blockIndex].type;
+          if (noveltyLocks.requiredBlockTypes.includes(targetType)) {
+            diff.push(`[locked] remove blocked on block[${patch.blockIndex}] (${targetType} is required)`);
+            continue;
+          }
+        }
+      }
+
       switch (patch.action) {
         case 'modify': {
           if (patch.blockIndex < 0 || patch.blockIndex >= cloned.blocks.length) break;
@@ -58,7 +84,7 @@ export function applyPatches(
           if (patch.blockIndex < 0 || patch.blockIndex >= cloned.blocks.length) break;
           const removed = cloned.blocks[patch.blockIndex];
           // Don't remove hero or footer
-          if (removed.type === 'HeroSplit' || removed.type === 'FooterSimple') break;
+          if (removed.type === 'HeroSplit' || removed.type === 'HeroTerminal' || removed.type === 'HeroChart' || removed.type === 'FooterSimple') break;
 
           cloned.blocks.splice(patch.blockIndex, 1);
           diff.push(`remove block[${patch.blockIndex}] (${removed.type})`);

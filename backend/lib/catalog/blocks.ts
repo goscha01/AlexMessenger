@@ -155,4 +155,71 @@ export const BLOCK_CATALOG: BlockMeta[] = [
       { id: 'cards', name: 'Cards', description: 'Numbered cards in a grid — clean step display' },
     ],
   },
+  // ===== Signature Artifact Blocks =====
+  {
+    type: 'HeroTerminal',
+    displayName: 'Hero (Terminal)',
+    description: 'Dark terminal-style hero with typed command lines, blinking cursor, and CTA',
+    requiredFields: ['headline', 'subheadline', 'ctaText', 'ctaHref', 'commandLines[]'],
+    variants: [
+      { id: 'dark', name: 'Dark', description: 'Dark terminal with green/cyan text on black background' },
+      { id: 'matrix', name: 'Matrix', description: 'Green-on-black matrix-style with falling characters backdrop' },
+      { id: 'retro', name: 'Retro', description: 'Amber-on-dark retro CRT terminal aesthetic' },
+    ],
+  },
+  {
+    type: 'HeroChart',
+    displayName: 'Hero (Chart)',
+    description: 'Hero section with embedded CSS-only chart (line/bar/area) showing key metrics',
+    requiredFields: ['headline', 'subheadline', 'ctaText', 'ctaHref', 'chartData[].label', 'chartData[].value'],
+    variants: [
+      { id: 'line-chart', name: 'Line Chart', description: 'SVG line chart with accent-colored data points' },
+      { id: 'bar-chart', name: 'Bar Chart', description: 'Vertical bar chart with gradient fills' },
+      { id: 'area-chart', name: 'Area Chart', description: 'Filled area chart with semi-transparent gradient' },
+    ],
+  },
+  {
+    type: 'DataVizBand',
+    displayName: 'Data Viz Band',
+    description: 'Full-width band of data visualizations — sparklines, progress bars, or gauges',
+    requiredFields: ['items[].label', 'items[].value'],
+    variants: [
+      { id: 'sparklines', name: 'Sparklines', description: 'Mini SVG sparkline charts next to each metric' },
+      { id: 'progress-bars', name: 'Progress Bars', description: 'Horizontal progress bars with percentage labels' },
+      { id: 'gauge', name: 'Gauge', description: 'Semi-circular gauge indicators for each metric' },
+    ],
+  },
+  {
+    type: 'DataTable',
+    displayName: 'Data Table',
+    description: 'Structured data table with headers, rows, and optional column highlighting',
+    requiredFields: ['sectionTitle', 'columns[]', 'rows[][]'],
+    variants: [
+      { id: 'striped', name: 'Striped', description: 'Alternating row backgrounds for easy scanning' },
+      { id: 'bordered', name: 'Bordered', description: 'Full borders around every cell — structured feel' },
+      { id: 'minimal', name: 'Minimal', description: 'Clean with subtle row dividers only' },
+    ],
+  },
+  {
+    type: 'ComparisonTable',
+    displayName: 'Comparison Table',
+    description: 'Feature comparison grid — plan tiers, us-vs-them, or feature checklist',
+    requiredFields: ['sectionTitle', 'columns[].name', 'rows[].feature', 'rows[].values[]'],
+    variants: [
+      { id: 'vs', name: 'Vs', description: 'Two-column "Us vs Them" comparison with highlighted winner' },
+      { id: 'tiers', name: 'Tiers', description: 'Multi-column pricing/plan tier comparison' },
+      { id: 'checklist', name: 'Checklist', description: 'Feature checklist with check/x marks per column' },
+    ],
+  },
+  {
+    type: 'SectionKicker',
+    displayName: 'Section Kicker',
+    description: 'Thin section transition element with label, counter, or decorative rule',
+    requiredFields: ['label'],
+    variants: [
+      { id: 'label-line', name: 'Label Line', description: 'Centered label with thin horizontal rules on each side' },
+      { id: 'counter', name: 'Counter', description: 'Large section number with small label — editorial feel' },
+      { id: 'icon-rule', name: 'Icon Rule', description: 'Small icon or symbol centered on a thin rule' },
+    ],
+  },
 ];

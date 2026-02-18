@@ -253,12 +253,22 @@ ${rawJson}
 Return the corrected JSON object only.`;
 }
 
-// ===== Gemini QA Critique Prompt (structural patches) =====
+// ===== Gemini QA Critique Prompt (anti-regression aware) =====
 
-export function geminiQACritiquePrompt(): string {
-  return `You are a senior UI/UX designer reviewing a rendered website design. Analyze the screenshot and provide specific, structural fixes.
+export function geminiQACritiquePrompt(noveltyLocks?: {
+  heroTypeLocked: string;
+  heroVariantLocked: string;
+  requiredBlockTypes: string[];
+  lockedVariants: { blockIndex: number; variant: string }[];
+}): string {
+  const lockRules = noveltyLocks ? `
 
-You MUST return at least 3 patches — even if the design looks decent. There is always room to improve.
+NOVELTY LOCKS (DO NOT violate these):
+- The hero block (block[0]) type "${noveltyLocks.heroTypeLocked}" and variant "${noveltyLocks.heroVariantLocked}" are INTENTIONALLY chosen. Do NOT swap-variant on block[0].
+- These block types MUST remain in the layout — do NOT remove them: ${noveltyLocks.requiredBlockTypes.join(', ') || 'none'}
+${noveltyLocks.lockedVariants.map(lv => `- Block[${lv.blockIndex}] variant "${lv.variant}" is locked — do NOT swap-variant on it.`).join('\n')}` : '';
+
+  return `You are a senior UI/UX designer reviewing a rendered website design. Analyze the screenshot and provide specific fixes focused on CONTENT QUALITY and VISUAL POLISH — NOT structural layout changes.
 
 Return a JSON object:
 {
@@ -282,12 +292,14 @@ Return a JSON object:
 
 PATCH ACTIONS:
 - "modify": Change a text field value (headline, description, ctaText, etc.)
-- "swap-variant": Change a block's variant (e.g. switch hero from split-left to editorial)
+- "swap-variant": Change a block's variant (ONLY for non-locked blocks)
 - "insert": Add a new block at the given index
-- "remove": Remove the block at the given index
+- "remove": Remove a block at the given index (ONLY for non-required blocks)
 
 AVAILABLE BLOCK TYPES & VARIANTS:
 - HeroSplit: split-left, split-right, centered, asymmetric, boxed, editorial, color-block
+- HeroTerminal: dark, matrix, retro
+- HeroChart: line-chart, bar-chart, area-chart
 - ValueProps3: cards, icons-inline, numbered
 - ServicesGrid: cards, minimal-list, icon-left
 - SocialProofRow: logo-bar, ticker, grid, stats-only
@@ -299,12 +311,18 @@ AVAILABLE BLOCK TYPES & VARIANTS:
 - FeatureZigzag: standard, with-image, numbered
 - StatsBand: dark, accent, minimal
 - ProcessTimeline: vertical, horizontal, cards
+- DataVizBand: sparklines, progress-bars, gauge
+- DataTable: striped, bordered, minimal
+- ComparisonTable: vs, tiers, checklist
+- SectionKicker: label-line, counter, icon-rule
+${lockRules}
 
 RULES:
-1. MUST return at least 3 patches
-2. Include at least 1 swap-variant patch if you see visual monotony
-3. Focus on: variant diversity, visual rhythm, content clarity, CTA strength
-4. If all blocks use similar card layouts, suggest swapping some to zigzag/bento/timeline
-5. blockIndex is 0-based
-6. Maximum 8 patches per review`;
+1. Return 1-5 patches (only patches that clearly improve the design)
+2. Focus on: content clarity, readability, spacing, color contrast, CTA visibility
+3. Prefer "modify" patches to improve text content over "swap-variant" patches
+4. Do NOT swap the hero variant unless the design is fundamentally broken
+5. Do NOT remove blocks that contribute to the page's unique structure
+6. blockIndex is 0-based
+7. Maximum 5 patches per review`;
 }

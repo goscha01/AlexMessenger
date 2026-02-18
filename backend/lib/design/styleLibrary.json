@@ -1,0 +1,549 @@
+{
+  "version": "1.0.0",
+  "notes": "Style library is authoritative. LLM must select from this list ONLY. Renderer must implement these tokens/motifs/wrappers and signatureArtifacts.",
+  "styles": [
+    {
+      "id": "modern-saas",
+      "label": "Modern SaaS",
+      "positioning": "Clean, modern B2B SaaS landing style",
+      "description": "Bright, spacious, product-forward. Subtle gradients, refined cards, confident CTAs.",
+      "recommendedFor": ["B2B SaaS", "CRM", "Automation tools", "Productivity apps"],
+      "tokens": {
+        "mode": "light",
+        "containerMaxWidth": 1200,
+        "radius": { "card": 16, "button": 12, "input": 12 },
+        "shadow": { "card": "soft", "hover": "softPlus" },
+        "border": { "width": 1, "style": "solid" },
+        "palette": {
+          "bg": "#F8FAFC",
+          "surface": "#FFFFFF",
+          "surface2": "#F1F5F9",
+          "text": "#0F172A",
+          "mutedText": "#475569",
+          "border": "rgba(15, 23, 42, 0.10)",
+          "primary": "#2563EB",
+          "primaryHover": "#1D4ED8",
+          "accent": "#7C3AED",
+          "accent2": "#06B6D4"
+        },
+        "spacing": {
+          "density": "normal",
+          "sectionY": 80,
+          "sectionYMobile": 56,
+          "gutterX": 24,
+          "gutterXMobile": 16
+        },
+        "typography": {
+          "pairingId": "inter-plus-dmserif",
+          "scaleId": "saas-balanced"
+        }
+      },
+      "motifs": {
+        "background": ["softGradient", "subtleNoise"],
+        "separators": ["none"],
+        "microElements": ["pillBadges", "iconChips"]
+      },
+      "wrappers": {
+        "allowed": ["Plain", "InsetPanel", "BandSoft"],
+        "minDistinctWrappers": 2
+      },
+      "signatureArtifacts": [
+        { "id": "productMockCard", "required": true },
+        { "id": "metricPillsRow", "required": false }
+      ],
+      "blockBias": {
+        "preferred": ["Hero", "ValueProps", "Bento", "Zigzag", "SocialProof", "FAQ", "CTA", "Footer"],
+        "avoid": ["HeavyTables", "DenseDashboards"]
+      },
+      "constraints": {
+        "forbiddenPatterns": [
+          "All sections with identical background",
+          "Overuse of full-width gradients",
+          "More than 1 primary accent on the same screen"
+        ],
+        "requiredPatterns": [
+          "At least one bento-style section OR zigzag features",
+          "At least one trust element (proof/stat/testimonial)",
+          "At least one section with non-white background (BandSoft or InsetPanel)"
+        ],
+        "ctaRules": { "maxPrimaryAboveFold": 1, "allowSecondary": true }
+      }
+    },
+
+    {
+      "id": "dark-tech",
+      "label": "Dark Tech",
+      "positioning": "Developer-tool / modern infra aesthetic",
+      "description": "Dark UI, thin lines, strong contrast, mono micro-labels, minimal rounding, no cheesy gradients.",
+      "recommendedFor": ["Developer tools", "AI platforms", "Infra", "Security"],
+      "tokens": {
+        "mode": "dark",
+        "containerMaxWidth": 1200,
+        "radius": { "card": 12, "button": 10, "input": 10 },
+        "shadow": { "card": "none", "hover": "none" },
+        "border": { "width": 1, "style": "solid" },
+        "palette": {
+          "bg": "#070A12",
+          "surface": "#0B1020",
+          "surface2": "#0F1730",
+          "text": "#E5E7EB",
+          "mutedText": "#9CA3AF",
+          "border": "rgba(229, 231, 235, 0.12)",
+          "primary": "#22C55E",
+          "primaryHover": "#16A34A",
+          "accent": "#7C3AED",
+          "accent2": "#06B6D4"
+        },
+        "spacing": {
+          "density": "tight",
+          "sectionY": 72,
+          "sectionYMobile": 52,
+          "gutterX": 24,
+          "gutterXMobile": 16
+        },
+        "typography": {
+          "pairingId": "spacegrotesk-plus-dmsans",
+          "scaleId": "tech-compact"
+        }
+      },
+      "motifs": {
+        "background": ["gridLines", "radialGlowSubtle"],
+        "separators": ["thinRules"],
+        "microElements": ["monoLabels", "statusPills", "kbdHints"]
+      },
+      "wrappers": {
+        "allowed": ["PlainDark", "BandDark", "InsetPanelDark", "GridCanvas"],
+        "minDistinctWrappers": 3
+      },
+      "signatureArtifacts": [
+        { "id": "terminalCard", "required": true },
+        { "id": "miniChartSvg", "required": true }
+      ],
+      "blockBias": {
+        "preferred": ["Hero", "StatsBand", "Bento", "Timeline", "Comparison", "FAQ", "Footer"],
+        "avoid": ["LogoBarOnly", "SoftPastelCards"]
+      },
+      "constraints": {
+        "forbiddenPatterns": [
+          "Light background overall",
+          "Rounded corners > 16px",
+          "Gradient CTA bands",
+          "Generic blue primary (#3B82F6) as primary"
+        ],
+        "requiredPatterns": [
+          "Visible grid canvas background somewhere",
+          "At least one full-width band section",
+          "At least one data-like artifact (terminal or chart)"
+        ],
+        "ctaRules": { "maxPrimaryAboveFold": 1, "allowSecondary": true }
+      }
+    },
+
+    {
+      "id": "editorial-premium",
+      "label": "Editorial Premium",
+      "positioning": "Luxury / agency / premium editorial aesthetic",
+      "description": "Big typography, lots of whitespace, thin rules, serif display font, minimal UI chrome.",
+      "recommendedFor": ["Agencies", "Consulting", "Personal brands", "High-end services"],
+      "tokens": {
+        "mode": "light",
+        "containerMaxWidth": 1120,
+        "radius": { "card": 10, "button": 10, "input": 10 },
+        "shadow": { "card": "none", "hover": "none" },
+        "border": { "width": 1, "style": "solid" },
+        "palette": {
+          "bg": "#FAF7F2",
+          "surface": "#FFFFFF",
+          "surface2": "#F5EFE6",
+          "text": "#1F2937",
+          "mutedText": "#6B7280",
+          "border": "rgba(31, 41, 55, 0.14)",
+          "primary": "#111827",
+          "primaryHover": "#000000",
+          "accent": "#B45309",
+          "accent2": "#0F766E"
+        },
+        "spacing": {
+          "density": "loose",
+          "sectionY": 96,
+          "sectionYMobile": 64,
+          "gutterX": 28,
+          "gutterXMobile": 16
+        },
+        "typography": {
+          "pairingId": "fraunces-plus-inter",
+          "scaleId": "editorial-large"
+        }
+      },
+      "motifs": {
+        "background": ["paperTextureSubtle"],
+        "separators": ["thinRules", "sectionKickers"],
+        "microElements": ["capsKickers", "minimalIcons"]
+      },
+      "wrappers": {
+        "allowed": ["Plain", "BandSoft", "InsetPanel"],
+        "minDistinctWrappers": 2
+      },
+      "signatureArtifacts": [
+        { "id": "editorialHeadlineLockup", "required": true },
+        { "id": "quoteFeature", "required": false }
+      ],
+      "blockBias": {
+        "preferred": ["Hero", "Zigzag", "QuoteBand", "Timeline", "Testimonials", "CTA", "Footer"],
+        "avoid": ["DashboardBento", "HeavyStatsBands"]
+      },
+      "constraints": {
+        "forbiddenPatterns": [
+          "Dense card grids",
+          "Overuse of icons",
+          "More than 2 accent colors on page"
+        ],
+        "requiredPatterns": [
+          "At least one section kicker + thin rule separators",
+          "At least one big-type headline treatment"
+        ],
+        "ctaRules": { "maxPrimaryAboveFold": 1, "allowSecondary": true }
+      }
+    },
+
+    {
+      "id": "bold-startup",
+      "label": "Bold Startup",
+      "positioning": "Energetic, vibrant, conversion-oriented",
+      "description": "Big type, bento blocks, bold gradients/color-blocking, playful but polished.",
+      "recommendedFor": ["Startups", "Marketing tools", "Creator tools", "Consumer-ish SaaS"],
+      "tokens": {
+        "mode": "light",
+        "containerMaxWidth": 1200,
+        "radius": { "card": 20, "button": 14, "input": 14 },
+        "shadow": { "card": "soft", "hover": "softPlus" },
+        "border": { "width": 1, "style": "solid" },
+        "palette": {
+          "bg": "#FFFFFF",
+          "surface": "#FFFFFF",
+          "surface2": "#F6F7FF",
+          "text": "#0B1220",
+          "mutedText": "#374151",
+          "border": "rgba(11, 18, 32, 0.10)",
+          "primary": "#7C3AED",
+          "primaryHover": "#6D28D9",
+          "accent": "#06B6D4",
+          "accent2": "#F97316"
+        },
+        "spacing": {
+          "density": "normal",
+          "sectionY": 84,
+          "sectionYMobile": 60,
+          "gutterX": 24,
+          "gutterXMobile": 16
+        },
+        "typography": {
+          "pairingId": "sora-plus-inter",
+          "scaleId": "startup-bold"
+        }
+      },
+      "motifs": {
+        "background": ["boldGradient", "blobShapes"],
+        "separators": ["none"],
+        "microElements": ["gradientBadges", "floatingHighlights"]
+      },
+      "wrappers": {
+        "allowed": ["Plain", "BandAccent", "InsetPanel"],
+        "minDistinctWrappers": 3
+      },
+      "signatureArtifacts": [
+        { "id": "bentoHero", "required": true },
+        { "id": "highlightPills", "required": true }
+      ],
+      "blockBias": {
+        "preferred": ["Hero", "Bento", "ValueProps", "Zigzag", "Testimonials", "CTA", "Footer"],
+        "avoid": ["MinimalMono", "TableHeavy"]
+      },
+      "constraints": {
+        "forbiddenPatterns": [
+          "Everything monochrome",
+          "All sections plain white",
+          "Tiny typography"
+        ],
+        "requiredPatterns": [
+          "At least one accent band section",
+          "At least one bento block",
+          "At least one playful motif (blob/gradient badge)"
+        ],
+        "ctaRules": { "maxPrimaryAboveFold": 1, "allowSecondary": true }
+      }
+    },
+
+    {
+      "id": "minimal-mono",
+      "label": "Minimal Mono",
+      "positioning": "Serious, structured, minimal, high clarity",
+      "description": "Monochrome + single accent, sharp edges, thin borders, dense information but tidy.",
+      "recommendedFor": ["Finance", "Security", "B2B enterprise", "Compliance"],
+      "tokens": {
+        "mode": "light",
+        "containerMaxWidth": 1120,
+        "radius": { "card": 8, "button": 8, "input": 8 },
+        "shadow": { "card": "none", "hover": "none" },
+        "border": { "width": 1, "style": "solid" },
+        "palette": {
+          "bg": "#FFFFFF",
+          "surface": "#FFFFFF",
+          "surface2": "#F3F4F6",
+          "text": "#111827",
+          "mutedText": "#4B5563",
+          "border": "rgba(17, 24, 39, 0.14)",
+          "primary": "#111827",
+          "primaryHover": "#000000",
+          "accent": "#EF4444",
+          "accent2": "#111827"
+        },
+        "spacing": {
+          "density": "tight",
+          "sectionY": 72,
+          "sectionYMobile": 52,
+          "gutterX": 24,
+          "gutterXMobile": 16
+        },
+        "typography": {
+          "pairingId": "ibmplexsans-plus-ibmplexserif",
+          "scaleId": "mono-structured"
+        }
+      },
+      "motifs": {
+        "background": ["none"],
+        "separators": ["thinRules"],
+        "microElements": ["numberedSections", "microLabels"]
+      },
+      "wrappers": {
+        "allowed": ["Plain", "InsetPanel"],
+        "minDistinctWrappers": 2
+      },
+      "signatureArtifacts": [
+        { "id": "structuredIndexNav", "required": true }
+      ],
+      "blockBias": {
+        "preferred": ["Hero", "Comparison", "Timeline", "FAQ", "Footer"],
+        "avoid": ["HeavyGradients", "SoftCards"]
+      },
+      "constraints": {
+        "forbiddenPatterns": [
+          "Multiple bright accents",
+          "Large gradients",
+          "Excessive rounding"
+        ],
+        "requiredPatterns": [
+          "Thin rules + section numbering",
+          "At least one structured section (comparison/timeline)"
+        ],
+        "ctaRules": { "maxPrimaryAboveFold": 1, "allowSecondary": true }
+      }
+    },
+
+    {
+      "id": "soft-cards",
+      "label": "Soft Cards",
+      "positioning": "Friendly, approachable, SMB / service-business",
+      "description": "Warm palette, soft elevation, rounded cards, simple illustrations, approachable type.",
+      "recommendedFor": ["Local services", "SMB tools", "Onboarding-heavy products"],
+      "tokens": {
+        "mode": "light",
+        "containerMaxWidth": 1200,
+        "radius": { "card": 22, "button": 16, "input": 16 },
+        "shadow": { "card": "soft", "hover": "softPlus" },
+        "border": { "width": 1, "style": "solid" },
+        "palette": {
+          "bg": "#FFF7ED",
+          "surface": "#FFFFFF",
+          "surface2": "#FFEFD6",
+          "text": "#1F2937",
+          "mutedText": "#6B7280",
+          "border": "rgba(31, 41, 55, 0.10)",
+          "primary": "#F97316",
+          "primaryHover": "#EA580C",
+          "accent": "#14B8A6",
+          "accent2": "#A78BFA"
+        },
+        "spacing": {
+          "density": "loose",
+          "sectionY": 88,
+          "sectionYMobile": 62,
+          "gutterX": 24,
+          "gutterXMobile": 16
+        },
+        "typography": {
+          "pairingId": "manrope-plus-inter",
+          "scaleId": "friendly-comfy"
+        }
+      },
+      "motifs": {
+        "background": ["softGradient", "blobShapes"],
+        "separators": ["none"],
+        "microElements": ["friendlyBadges", "roundedIcons"]
+      },
+      "wrappers": {
+        "allowed": ["Plain", "BandSoft", "InsetPanel", "BandAccent"],
+        "minDistinctWrappers": 3
+      },
+      "signatureArtifacts": [
+        { "id": "illustratedHero", "required": true }
+      ],
+      "blockBias": {
+        "preferred": ["Hero", "ValueProps", "Services", "Testimonials", "FAQ", "CTA", "Footer"],
+        "avoid": ["TechnicalGrid", "TableHeavy"]
+      },
+      "constraints": {
+        "forbiddenPatterns": [
+          "Dark/harsh palette",
+          "Sharp corners everywhere",
+          "Dense tables"
+        ],
+        "requiredPatterns": [
+          "At least one illustration placement (hero or bento tiles)",
+          "At least one testimonial/trust section"
+        ],
+        "ctaRules": { "maxPrimaryAboveFold": 1, "allowSecondary": true }
+      }
+    },
+
+    {
+      "id": "technical-dashboard",
+      "label": "Technical Dashboard",
+      "positioning": "Data-heavy, structured, admin-panel feel (but polished)",
+      "description": "Data bands, tables, charts, structured grids, minimal ornamentation.",
+      "recommendedFor": ["Analytics", "Ops dashboards", "CRM admin", "Reporting tools"],
+      "tokens": {
+        "mode": "dark",
+        "containerMaxWidth": 1280,
+        "radius": { "card": 10, "button": 10, "input": 10 },
+        "shadow": { "card": "none", "hover": "none" },
+        "border": { "width": 1, "style": "solid" },
+        "palette": {
+          "bg": "#060B14",
+          "surface": "#0B1220",
+          "surface2": "#0F1B33",
+          "text": "#E5E7EB",
+          "mutedText": "#93A4B8",
+          "border": "rgba(229, 231, 235, 0.12)",
+          "primary": "#06B6D4",
+          "primaryHover": "#0891B2",
+          "accent": "#F97316",
+          "accent2": "#22C55E"
+        },
+        "spacing": {
+          "density": "tight",
+          "sectionY": 68,
+          "sectionYMobile": 50,
+          "gutterX": 24,
+          "gutterXMobile": 16
+        },
+        "typography": {
+          "pairingId": "spacegrotesk-plus-dmsans",
+          "scaleId": "dashboard-compact"
+        }
+      },
+      "motifs": {
+        "background": ["gridLines"],
+        "separators": ["thinRules"],
+        "microElements": ["monoLabels", "statusPills", "tableHeaders"]
+      },
+      "wrappers": {
+        "allowed": ["GridCanvas", "BandDark", "InsetPanelDark"],
+        "minDistinctWrappers": 3
+      },
+      "signatureArtifacts": [
+        { "id": "dataTable", "required": true },
+        { "id": "miniChartSvg", "required": true }
+      ],
+      "blockBias": {
+        "preferred": ["Hero", "StatsBand", "DataVizBand", "Comparison", "Timeline", "Footer"],
+        "avoid": ["SoftCards", "EditorialHugeType"]
+      },
+      "constraints": {
+        "forbiddenPatterns": [
+          "All-white design",
+          "Pastel backgrounds",
+          "Big playful blobs"
+        ],
+        "requiredPatterns": [
+          "At least one full-width data viz band (chart/table)",
+          "At least one structured table-like component"
+        ],
+        "ctaRules": { "maxPrimaryAboveFold": 1, "allowSecondary": true }
+      }
+    }
+  ],
+  "fontPairings": [
+    { "id": "inter-plus-dmserif", "heading": "Inter", "body": "DM Serif Display", "fallback": "system-ui" },
+    { "id": "spacegrotesk-plus-dmsans", "heading": "Space Grotesk", "body": "DM Sans", "fallback": "system-ui" },
+    { "id": "fraunces-plus-inter", "heading": "Fraunces", "body": "Inter", "fallback": "system-ui" },
+    { "id": "sora-plus-inter", "heading": "Sora", "body": "Inter", "fallback": "system-ui" },
+    { "id": "ibmplexsans-plus-ibmplexserif", "heading": "IBM Plex Sans", "body": "IBM Plex Serif", "fallback": "system-ui" },
+    { "id": "manrope-plus-inter", "heading": "Manrope", "body": "Inter", "fallback": "system-ui" }
+  ],
+  "typeScales": [
+    {
+      "id": "saas-balanced",
+      "h1": { "mobile": "text-4xl", "desktop": "text-6xl" },
+      "h2": { "mobile": "text-2xl", "desktop": "text-3xl" },
+      "h3": { "mobile": "text-xl", "desktop": "text-2xl" },
+      "body": { "mobile": "text-base", "desktop": "text-lg" },
+      "lead": { "mobile": "text-lg", "desktop": "text-xl" },
+      "line": { "body": "leading-relaxed", "heading": "leading-tight" }
+    },
+    {
+      "id": "tech-compact",
+      "h1": { "mobile": "text-4xl", "desktop": "text-5xl" },
+      "h2": { "mobile": "text-2xl", "desktop": "text-3xl" },
+      "h3": { "mobile": "text-lg", "desktop": "text-xl" },
+      "body": { "mobile": "text-sm", "desktop": "text-base" },
+      "lead": { "mobile": "text-base", "desktop": "text-lg" },
+      "line": { "body": "leading-relaxed", "heading": "leading-snug" }
+    },
+    {
+      "id": "editorial-large",
+      "h1": { "mobile": "text-5xl", "desktop": "text-7xl" },
+      "h2": { "mobile": "text-3xl", "desktop": "text-4xl" },
+      "h3": { "mobile": "text-xl", "desktop": "text-2xl" },
+      "body": { "mobile": "text-base", "desktop": "text-lg" },
+      "lead": { "mobile": "text-xl", "desktop": "text-2xl" },
+      "line": { "body": "leading-relaxed", "heading": "leading-tight" }
+    },
+    {
+      "id": "startup-bold",
+      "h1": { "mobile": "text-5xl", "desktop": "text-7xl" },
+      "h2": { "mobile": "text-3xl", "desktop": "text-4xl" },
+      "h3": { "mobile": "text-xl", "desktop": "text-2xl" },
+      "body": { "mobile": "text-base", "desktop": "text-lg" },
+      "lead": { "mobile": "text-xl", "desktop": "text-2xl" },
+      "line": { "body": "leading-relaxed", "heading": "leading-tight" }
+    },
+    {
+      "id": "mono-structured",
+      "h1": { "mobile": "text-4xl", "desktop": "text-5xl" },
+      "h2": { "mobile": "text-2xl", "desktop": "text-3xl" },
+      "h3": { "mobile": "text-lg", "desktop": "text-xl" },
+      "body": { "mobile": "text-sm", "desktop": "text-base" },
+      "lead": { "mobile": "text-base", "desktop": "text-lg" },
+      "line": { "body": "leading-relaxed", "heading": "leading-snug" }
+    },
+    {
+      "id": "friendly-comfy",
+      "h1": { "mobile": "text-4xl", "desktop": "text-6xl" },
+      "h2": { "mobile": "text-2xl", "desktop": "text-3xl" },
+      "h3": { "mobile": "text-xl", "desktop": "text-2xl" },
+      "body": { "mobile": "text-base", "desktop": "text-lg" },
+      "lead": { "mobile": "text-lg", "desktop": "text-xl" },
+      "line": { "body": "leading-relaxed", "heading": "leading-tight" }
+    },
+    {
+      "id": "dashboard-compact",
+      "h1": { "mobile": "text-4xl", "desktop": "text-5xl" },
+      "h2": { "mobile": "text-2xl", "desktop": "text-3xl" },
+      "h3": { "mobile": "text-lg", "desktop": "text-xl" },
+      "body": { "mobile": "text-sm", "desktop": "text-base" },
+      "lead": { "mobile": "text-base", "desktop": "text-lg" },
+      "line": { "body": "leading-relaxed", "heading": "leading-snug" }
+    }
+  ]
+}
