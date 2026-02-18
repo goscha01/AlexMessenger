@@ -553,14 +553,27 @@ app.post('/directions', async (req: Request, res: Response) => {
           const signature = getSignatureForStyle(selection.styleId);
           const density = getDensityForStyle(style);
 
-          // Render preview HTML
+          // Render preview HTML (live iframe, no screenshot needed)
           let previewHtml = '';
-          let previewScreenshot = '';
 
           if (previewBlocks.length > 0) {
             previewHtml = renderPreviewHtml(previewBlocks, tokens, signature, density);
-            // Take screenshot
-            previewScreenshot = await screenshotPreviewLocal(previewHtml);
+          } else {
+            // Fallback: generate a simple color/typography showcase
+            const t = tokens;
+            previewHtml = `<!DOCTYPE html><html><head>
+<link href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(t.typography.headingFont)}:wght@700&family=${encodeURIComponent(t.typography.bodyFont)}:wght@400&display=swap" rel="stylesheet">
+<style>*{margin:0;box-sizing:border-box}body{font-family:'${t.typography.bodyFont}',system-ui,sans-serif;background:${t.palette.background};color:${t.palette.textPrimary}}</style>
+</head><body>
+<div style="padding:3rem 2rem;text-align:center">
+  <div style="display:flex;gap:8px;justify-content:center;margin-bottom:2rem">
+    ${[t.palette.primary, t.palette.secondary, t.palette.accent, t.palette.surface].map(c => `<div style="width:48px;height:48px;border-radius:8px;background:${c}"></div>`).join('')}
+  </div>
+  <h1 style="font-family:'${t.typography.headingFont}',system-ui,sans-serif;font-size:2rem;font-weight:700;margin-bottom:0.5rem;color:${t.palette.textPrimary}">${style.label}</h1>
+  <p style="color:${t.palette.textSecondary};font-size:0.95rem;max-width:400px;margin:0 auto">Style preview — full layout will be generated after you choose this direction.</p>
+</div>
+</body></html>`;
+            console.log(`[directions] Using fallback preview for ${selection.styleId}`);
           }
 
           // Get DNA options for this style
@@ -575,7 +588,6 @@ app.post('/directions', async (req: Request, res: Response) => {
             reason: selection.reason,
             bestFor: selection.bestFor,
             previewHtml,
-            previewScreenshot: previewScreenshot ? `data:image/png;base64,${previewScreenshot}` : '',
             dnaOptions,
           };
         });

@@ -32,7 +32,6 @@ interface Direction {
   reason: string;
   bestFor: string;
   previewHtml: string;
-  previewScreenshot: string;
   dnaOptions?: LayoutDNA[];
 }
 
@@ -242,6 +241,7 @@ export default function Home() {
   const [runQa, setRunQa] = useState(true);
   const [state, setState] = useState<AppState>({ status: 'idle' });
   const [activeTab, setActiveTab] = useState<Tab>('preview');
+  const [enlargedPreview, setEnlargedPreview] = useState<{ html: string; label: string } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   // Stored from directions step for reuse in finalize
@@ -362,15 +362,6 @@ export default function Home() {
   }, [withIllustrations, runQa]);
 
   // ─── Navigation ─────────────────────────────────────────────────────────────
-
-  function goBackToDirections() {
-    const dirData = directionsDataRef.current;
-    if (dirData && state.status === 'final') {
-      // We need the directions data to go back — but we don't store it after finalize.
-      // Best we can do is go back to idle and re-generate.
-    }
-    setState({ status: 'idle' });
-  }
 
   function goBackToIdle() {
     setState({ status: 'idle' });
@@ -506,16 +497,29 @@ export default function Home() {
                   className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
                 >
                   {/* Preview thumbnail */}
-                  <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
-                    {dir.previewScreenshot ? (
-                      <img
-                        src={dir.previewScreenshot}
-                        alt={`${dir.styleLabel} preview`}
-                        className="w-full h-full object-cover object-top"
-                      />
+                  <div
+                    className="aspect-[4/3] bg-gray-100 relative overflow-hidden cursor-pointer group"
+                    onClick={() => dir.previewHtml && setEnlargedPreview({ html: dir.previewHtml, label: `${dir.id} — ${dir.styleLabel}` })}
+                    title="Click to enlarge"
+                  >
+                    {dir.previewHtml ? (
+                      <>
+                        <iframe
+                          srcDoc={dir.previewHtml}
+                          className="w-[800px] h-[600px] border-0 origin-top-left pointer-events-none"
+                          style={{ transform: 'scale(0.42)', transformOrigin: 'top left' }}
+                          sandbox="allow-scripts allow-same-origin"
+                          title={`${dir.styleLabel} preview`}
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm text-gray-900 px-3 py-1.5 rounded-full text-sm font-semibold shadow-sm">
+                            Click to enlarge
+                          </span>
+                        </div>
+                      </>
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
-                        No preview
+                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
+                        Preview unavailable
                       </div>
                     )}
                     <div className="absolute top-3 left-3">
@@ -900,6 +904,36 @@ export default function Home() {
                   )}
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ─── Enlarged Preview Modal ──────────────────────────────────────── */}
+        {enlargedPreview && (
+          <div
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6"
+            onClick={() => setEnlargedPreview(null)}
+          >
+            <div
+              className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-5xl max-h-[90vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+                <h3 className="font-semibold text-gray-900">Preview: {enlargedPreview.label}</h3>
+                <button
+                  onClick={() => setEnlargedPreview(null)}
+                  className="text-gray-400 hover:text-gray-700 transition-colors text-xl leading-none px-2"
+                >
+                  x
+                </button>
+              </div>
+              <iframe
+                srcDoc={enlargedPreview.html}
+                className="w-full flex-1 border-0"
+                style={{ minHeight: '70vh' }}
+                sandbox="allow-scripts allow-same-origin"
+                title="Enlarged preview"
+              />
             </div>
           </div>
         )}
