@@ -1,5 +1,6 @@
 import { PageSchema, PageSchemaOutput, QAPatchV2Item, NoveltyLocks } from '@/lib/catalog/schemas';
 import { BLOCK_CATALOG } from '@/lib/catalog/blocks';
+import { createSkeletonBlock } from '@/lib/catalog/skeletons';
 
 const DEFAULT_VARIANTS: Record<string, string> = {};
 for (const b of BLOCK_CATALOG) {
@@ -51,6 +52,14 @@ export function applyPatches(
             continue;
           }
         }
+        // Block remove on sectionOrder blocks
+        if (patch.action === 'remove' && noveltyLocks.lockedSectionOrder && patch.blockIndex >= 0 && patch.blockIndex < cloned.blocks.length) {
+          const targetType = cloned.blocks[patch.blockIndex].type;
+          if (noveltyLocks.lockedSectionOrder.includes(targetType)) {
+            diff.push(`[locked] remove blocked on block[${patch.blockIndex}] (${targetType} is in locked sectionOrder)`);
+            continue;
+          }
+        }
       }
 
       switch (patch.action) {
@@ -96,8 +105,7 @@ export function applyPatches(
           if (!patch.newBlockType) break;
           if (patch.blockIndex < 0 || patch.blockIndex > cloned.blocks.length) break;
 
-          // Create a minimal placeholder block — the content will be from newValue or defaults
-          const newBlock = createPlaceholderBlock(
+          const newBlock = createSkeletonBlock(
             patch.newBlockType,
             patch.newVariant || DEFAULT_VARIANTS[patch.newBlockType] || '',
           );
@@ -123,53 +131,4 @@ export function applyPatches(
   // If patching broke validation, return original
   console.warn('[patch] QA patches broke schema validation, reverting:', result.error.issues.slice(0, 3));
   return { schema, appliedCount: 0, diff: ['Patches reverted — broke validation'] };
-}
-
-function createPlaceholderBlock(type: string, variant: string): Record<string, unknown> | null {
-  switch (type) {
-    case 'StatsBand':
-      return {
-        type: 'StatsBand',
-        variant: variant || 'accent',
-        items: [
-          { value: '500+', label: 'Clients' },
-          { value: '99%', label: 'Satisfaction' },
-          { value: '24/7', label: 'Support' },
-        ],
-      };
-    case 'BentoGrid':
-      return {
-        type: 'BentoGrid',
-        variant: variant || 'mixed',
-        sectionTitle: 'Key Features',
-        items: [
-          { title: 'Feature 1', description: 'Description of feature 1', span: 'wide' },
-          { title: 'Feature 2', description: 'Description of feature 2', span: 'normal' },
-          { title: 'Feature 3', description: 'Description of feature 3', span: 'normal' },
-        ],
-      };
-    case 'FeatureZigzag':
-      return {
-        type: 'FeatureZigzag',
-        variant: variant || 'standard',
-        sectionTitle: 'How It Works',
-        items: [
-          { title: 'Step 1', description: 'First step description' },
-          { title: 'Step 2', description: 'Second step description' },
-        ],
-      };
-    case 'ProcessTimeline':
-      return {
-        type: 'ProcessTimeline',
-        variant: variant || 'horizontal',
-        sectionTitle: 'Our Process',
-        steps: [
-          { title: 'Start', description: 'Begin the process' },
-          { title: 'Execute', description: 'Carry out the plan' },
-          { title: 'Deliver', description: 'See the results' },
-        ],
-      };
-    default:
-      return null;
-  }
 }

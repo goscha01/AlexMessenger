@@ -422,6 +422,7 @@ export const LayoutDNASchema = z.object({
   forbiddenBlocks: z.array(z.string()),
   blockCount: z.object({ min: z.number(), max: z.number() }),
   structureHint: z.string(),
+  sectionOrder: z.array(z.string()),
 });
 
 export const NoveltyLocksSchema = z.object({
@@ -429,6 +430,7 @@ export const NoveltyLocksSchema = z.object({
   heroVariantLocked: z.string(),
   requiredBlockTypes: z.array(z.string()),
   lockedVariants: z.array(z.object({ blockIndex: z.number(), variant: z.string() })),
+  lockedSectionOrder: z.array(z.string()).optional(),
 });
 
 // ===== Style Library V3 Schemas =====

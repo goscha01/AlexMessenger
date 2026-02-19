@@ -108,16 +108,28 @@ export function layoutPlanPrompt(
   styleLibraryJson: string,
   dnaJson?: string,
 ): string {
-  const dnaConstraints = dnaJson ? `
+  const dnaConstraints = dnaJson ? (() => {
+    const dna = JSON.parse(dnaJson);
+    return `
 
-LAYOUT_DNA_CONSTRAINTS (MUST follow these exactly — they override general constraints):
-${dnaJson}
-- The hero block MUST be the type and variant specified in the DNA.
-- You MUST include ALL requiredBlocks from the DNA.
-- You MUST NOT include ANY forbiddenBlocks from the DNA.
-- You MUST use the layout patterns specified in requiredPatterns.
-- Block count MUST be within the DNA's blockCount range.
-- Follow the structureHint for overall page composition.` : '';
+LAYOUT BLUEPRINT (STRICT CONTRACT — violations will be auto-repaired by the build system):
+${JSON.stringify({
+  lockedHero: { type: dna.heroType, variant: dna.heroVariant },
+  requiredBlocks: dna.requiredBlocks,
+  forbiddenBlocks: dna.forbiddenBlocks,
+  sectionOrder: dna.sectionOrder,
+  patterns: dna.requiredPatterns,
+  blockCount: dna.blockCount,
+}, null, 2)}
+
+You MUST:
+- Use lockedHero type and variant exactly as specified.
+- Include ALL requiredBlocks in the order shown in sectionOrder.
+- Follow sectionOrder strictly: hero first, footer last, required blocks in the listed order.
+- You MAY add optional blocks between required blocks to reach blockCount.min.
+- You MAY NOT remove required blocks, add forbidden blocks, or change hero variant.
+- Violations will be deterministically repaired, so follow the blueprint precisely.`;
+  })() : '';
 
   const nonce = Math.random().toString(36).slice(2, 10);
   return `Create a layout plan for a single-page marketing site. We only care about DESIGN quality and composition.
@@ -173,9 +185,25 @@ export function finalSchemaPrompt(
   styleLibraryJson: string,
   dnaJson?: string,
 ): string {
-  const dnaConstraints = dnaJson ? `
-- LAYOUT DNA ACTIVE: The hero block type/variant, required blocks, and forbidden blocks from the DNA MUST be preserved exactly as specified in the layout plan. Do NOT change the hero type or variant.
-DNA: ${dnaJson}` : '';
+  const dnaConstraints = dnaJson ? (() => {
+    const dna = JSON.parse(dnaJson);
+    return `
+
+LAYOUT BLUEPRINT (STRICT CONTRACT — violations will be auto-repaired):
+${JSON.stringify({
+  lockedHero: { type: dna.heroType, variant: dna.heroVariant },
+  requiredBlocks: dna.requiredBlocks,
+  forbiddenBlocks: dna.forbiddenBlocks,
+  sectionOrder: dna.sectionOrder,
+}, null, 2)}
+
+BLUEPRINT RULES:
+- The hero block MUST be type "${dna.heroType}" with variant "${dna.heroVariant}" — do NOT change these.
+- ALL requiredBlocks MUST appear in the output blocks array.
+- NO forbiddenBlocks may appear in the output blocks array.
+- Blocks MUST follow sectionOrder: required blocks in that relative order, optional blocks between them.
+- Violations will be deterministically repaired, so follow the blueprint precisely.`;
+  })() : '';
 
   const nonce = Math.random().toString(36).slice(2, 10);
   return `Generate the final PageSchema for rendering. This is design-first: composition, typography, wrappers, and signature artifacts matter most.

@@ -14,6 +14,7 @@ export interface LayoutDNA {
   forbiddenBlocks: string[];
   blockCount: { min: number; max: number };
   structureHint: string;
+  sectionOrder: string[];
 }
 
 export interface StyleDNASet {
@@ -40,6 +41,7 @@ const modernSaas: StyleDNASet = {
       blockCount: { min: 7, max: 9 },
       structureHint:
         'Open with the split hero, then ValueProps3 for a quick feature scan, follow with SocialProofRow as a trust band, TestimonialsCards for deeper proof, FAQAccordion near the bottom, and close with CTA + Footer.',
+      sectionOrder: ['HeroSplit', 'ValueProps3', 'SocialProofRow', 'TestimonialsCards', 'FAQAccordion', 'CTASection', 'FooterSimple'],
     },
     {
       id: 'modern-saas-b',
@@ -54,6 +56,7 @@ const modernSaas: StyleDNASet = {
       blockCount: { min: 6, max: 8 },
       structureHint:
         'Start with the boxed hero to frame the product, drop into a BentoGrid for feature discovery, alternate with FeatureZigzag for detail, punctuate with StatsBand as a credibility break, then CTA + Footer.',
+      sectionOrder: ['HeroSplit', 'BentoGrid', 'FeatureZigzag', 'StatsBand', 'CTASection', 'FooterSimple'],
     },
     {
       id: 'modern-saas-c',
@@ -68,6 +71,7 @@ const modernSaas: StyleDNASet = {
       blockCount: { min: 6, max: 8 },
       structureHint:
         'Lead with the asymmetric hero for visual intrigue, immediately hit StatsBand to anchor credibility, follow with TestimonialsCards, use ComparisonTable to differentiate from competitors, then CTA + Footer.',
+      sectionOrder: ['HeroSplit', 'StatsBand', 'TestimonialsCards', 'ComparisonTable', 'CTASection', 'FooterSimple'],
     },
   ],
 };
@@ -91,6 +95,7 @@ const darkTech: StyleDNASet = {
       blockCount: { min: 6, max: 8 },
       structureHint:
         'Open with the editorial hero for an authoritative tone, present features in a BentoGrid, insert StatsBand as a metric credibility break, show TestimonialsCards, then CTA + Footer.',
+      sectionOrder: ['HeroSplit', 'BentoGrid', 'StatsBand', 'TestimonialsCards', 'CTASection', 'FooterSimple'],
     },
     {
       id: 'dark-tech-b',
@@ -105,6 +110,7 @@ const darkTech: StyleDNASet = {
       blockCount: { min: 6, max: 8 },
       structureHint:
         'Start with the matrix terminal hero for maximum dev impact, flow into DataVizBand for live-data feel, use ComparisonTable to show technical superiority, anchor with StatsBand, then CTA + Footer.',
+      sectionOrder: ['HeroTerminal', 'DataVizBand', 'ComparisonTable', 'StatsBand', 'CTASection', 'FooterSimple'],
     },
     {
       id: 'dark-tech-c',
@@ -119,6 +125,7 @@ const darkTech: StyleDNASet = {
       blockCount: { min: 6, max: 8 },
       structureHint:
         'Lead with the area-chart hero to signal data prowess, alternate features using FeatureZigzag, present raw data in DataTable, add SocialProofRow for community trust, then CTA + Footer.',
+      sectionOrder: ['HeroChart', 'FeatureZigzag', 'DataTable', 'SocialProofRow', 'CTASection', 'FooterSimple'],
     },
   ],
 };
@@ -142,6 +149,7 @@ const editorialPremium: StyleDNASet = {
       blockCount: { min: 6, max: 8 },
       structureHint:
         'Open with the editorial hero for a refined first impression, tell the product story through FeatureZigzag, add TestimonialsCards as endorsements, close knowledge gaps with FAQAccordion, then CTA + Footer.',
+      sectionOrder: ['HeroSplit', 'FeatureZigzag', 'TestimonialsCards', 'FAQAccordion', 'CTASection', 'FooterSimple'],
     },
     {
       id: 'editorial-premium-b',
@@ -156,6 +164,7 @@ const editorialPremium: StyleDNASet = {
       blockCount: { min: 6, max: 8 },
       structureHint:
         'Start with the asymmetric hero to break convention, use SectionKicker to introduce the BentoGrid spread, layer in DataVizBand for visual storytelling, then CTA + Footer.',
+      sectionOrder: ['HeroSplit', 'SectionKicker', 'BentoGrid', 'DataVizBand', 'CTASection', 'FooterSimple'],
     },
     {
       id: 'editorial-premium-c',
@@ -170,6 +179,7 @@ const editorialPremium: StyleDNASet = {
       blockCount: { min: 6, max: 8 },
       structureHint:
         'Open with the bold color-block hero, guide the reader through a ProcessTimeline narrative, validate with TestimonialsCards, punctuate with StatsBand, then CTA + Footer.',
+      sectionOrder: ['HeroSplit', 'ProcessTimeline', 'TestimonialsCards', 'StatsBand', 'CTASection', 'FooterSimple'],
     },
   ],
 };
@@ -193,6 +203,7 @@ const boldStartup: StyleDNASet = {
       blockCount: { min: 6, max: 8 },
       structureHint:
         'Blast open with the color-block hero for instant energy, present ValueProps3 for quick wins, add SocialProofRow as a trust strip, optionally expand with a feature block, then CTA + Footer.',
+      sectionOrder: ['HeroSplit', 'ValueProps3', 'SocialProofRow', 'CTASection', 'FooterSimple'],
     },
     {
       id: 'bold-startup-b',
@@ -207,6 +218,7 @@ const boldStartup: StyleDNASet = {
       blockCount: { min: 6, max: 8 },
       structureHint:
         'Lead with the bar-chart hero for immediate data impact, drop into StatsBand for headline metrics, showcase features in BentoGrid, use ComparisonTable to crush competitors, then CTA + Footer.',
+      sectionOrder: ['HeroChart', 'StatsBand', 'BentoGrid', 'ComparisonTable', 'CTASection', 'FooterSimple'],
     },
     {
       id: 'bold-startup-c',
@@ -221,6 +233,7 @@ const boldStartup: StyleDNASet = {
       blockCount: { min: 6, max: 8 },
       structureHint:
         'Open with the centered hero for bold simplicity, alternate features through FeatureZigzag, map the user journey with ProcessTimeline, seal it with TestimonialsCards, then CTA + Footer.',
+      sectionOrder: ['HeroSplit', 'FeatureZigzag', 'ProcessTimeline', 'TestimonialsCards', 'CTASection', 'FooterSimple'],
     },
   ],
 };
@@ -244,6 +257,7 @@ const minimalMono: StyleDNASet = {
       blockCount: { min: 6, max: 7 },
       structureHint:
         'Open with the centered hero for maximum whitespace, present ValueProps3 cleanly, allow ample breathing room between sections, close with FAQAccordion, then CTA + Footer. Favour restraint over density.',
+      sectionOrder: ['HeroSplit', 'ValueProps3', 'FAQAccordion', 'CTASection', 'FooterSimple'],
     },
     {
       id: 'minimal-mono-b',
@@ -258,6 +272,7 @@ const minimalMono: StyleDNASet = {
       blockCount: { min: 6, max: 8 },
       structureHint:
         'Start with the editorial hero for quiet authority, use SectionKicker to introduce DataTable content, punctuate with StatsBand, keep visual noise to a minimum, then CTA + Footer.',
+      sectionOrder: ['HeroSplit', 'SectionKicker', 'DataTable', 'StatsBand', 'CTASection', 'FooterSimple'],
     },
     {
       id: 'minimal-mono-c',
@@ -272,6 +287,7 @@ const minimalMono: StyleDNASet = {
       blockCount: { min: 6, max: 7 },
       structureHint:
         'Open with the boxed hero for contained elegance, guide the user through ProcessTimeline, elaborate with FeatureZigzag, keep spacing generous and tone muted, then CTA + Footer.',
+      sectionOrder: ['HeroSplit', 'ProcessTimeline', 'FeatureZigzag', 'CTASection', 'FooterSimple'],
     },
   ],
 };
@@ -295,6 +311,7 @@ const softCards: StyleDNASet = {
       blockCount: { min: 6, max: 8 },
       structureHint:
         'Open with the split-left hero in soft tones, present ValueProps3 as rounded cards, expand with ServicesGrid in a card layout, add TestimonialsCards for warmth, then CTA + Footer. Emphasise rounded corners and pastel fills.',
+      sectionOrder: ['HeroSplit', 'ValueProps3', 'ServicesGrid', 'TestimonialsCards', 'CTASection', 'FooterSimple'],
     },
     {
       id: 'soft-cards-b',
@@ -309,6 +326,7 @@ const softCards: StyleDNASet = {
       blockCount: { min: 6, max: 8 },
       structureHint:
         'Start with the boxed hero (card feel), flow into BentoGrid with rounded soft cards, add SocialProofRow as a pastel trust band, close with FAQAccordion, then CTA + Footer.',
+      sectionOrder: ['HeroSplit', 'BentoGrid', 'SocialProofRow', 'FAQAccordion', 'CTASection', 'FooterSimple'],
     },
     {
       id: 'soft-cards-c',
@@ -323,6 +341,7 @@ const softCards: StyleDNASet = {
       blockCount: { min: 6, max: 8 },
       structureHint:
         'Open with the centered hero for a calm introduction, alternate features through FeatureZigzag using card containers, present ComparisonTable in a soft card style, punctuate with StatsBand, then CTA + Footer.',
+      sectionOrder: ['HeroSplit', 'FeatureZigzag', 'ComparisonTable', 'StatsBand', 'CTASection', 'FooterSimple'],
     },
   ],
 };
@@ -346,6 +365,7 @@ const technicalDashboard: StyleDNASet = {
       blockCount: { min: 6, max: 8 },
       structureHint:
         'Open with the centered hero showing a dashboard preview, immediately follow with StatsBand for KPI metrics, present features in BentoGrid (widget-like cards), display DataTable for detailed data, then CTA + Footer.',
+      sectionOrder: ['HeroSplit', 'StatsBand', 'BentoGrid', 'DataTable', 'CTASection', 'FooterSimple'],
     },
     {
       id: 'technical-dashboard-b',
@@ -360,6 +380,7 @@ const technicalDashboard: StyleDNASet = {
       blockCount: { min: 6, max: 8 },
       structureHint:
         'Lead with the line-chart hero for an analytics-first impression, expand with DataVizBand for deeper visualisation, use ComparisonTable for plan/feature breakdowns, map the workflow in ProcessTimeline, then CTA + Footer.',
+      sectionOrder: ['HeroChart', 'DataVizBand', 'ComparisonTable', 'ProcessTimeline', 'CTASection', 'FooterSimple'],
     },
     {
       id: 'technical-dashboard-c',
@@ -374,6 +395,7 @@ const technicalDashboard: StyleDNASet = {
       blockCount: { min: 6, max: 8 },
       structureHint:
         'Open with the dark terminal hero for a DevOps feel, follow with StatsBand in a dark theme for uptime/performance metrics, present DataTable for detailed operations data, use FeatureZigzag for product capabilities, then CTA + Footer.',
+      sectionOrder: ['HeroTerminal', 'StatsBand', 'DataTable', 'FeatureZigzag', 'CTASection', 'FooterSimple'],
     },
   ],
 };

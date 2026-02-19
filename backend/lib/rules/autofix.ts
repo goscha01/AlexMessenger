@@ -7,6 +7,7 @@ import { FONT_PAIRINGS } from '@/lib/design/fonts';
 import { BLOCK_CATALOG } from '@/lib/catalog/blocks';
 import { isValidHex } from '@/lib/design/colorUtils';
 import { ensureDiversity } from '@/lib/design/diversify';
+import { createSkeletonBlock } from '@/lib/catalog/skeletons';
 
 const VALID_PRESET_IDS = new Set(DESIGN_PRESETS.map((p) => p.id));
 const VALID_FONT_IDS = new Set(FONT_PAIRINGS.map((f) => f.id));
@@ -337,5 +338,202 @@ export function computeNoveltyLocks(blocks: Block[], dna?: LayoutDNA): NoveltyLo
           return dna.requiredBlocks.includes(block.type as string);
         }),
     ],
+    lockedSectionOrder: dna?.sectionOrder,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Blueprint Compliance Enforcement
+// ---------------------------------------------------------------------------
+// Deterministically repairs Claude's output to match the DNA blueprint.
+// Called AFTER validateAndAutofixV3() and BEFORE rendering.
+
+const HERO_TYPES = new Set(['HeroSplit', 'HeroTerminal', 'HeroChart']);
+
+export function enforceBlueprintCompliance(
+  blocks: Block[],
+  dna: LayoutDNA,
+): { blocks: Block[]; repairs: string[] } {
+  const repairs: string[] = [];
+  let result = [...blocks];
+
+  // ── Step 1: Hero check ───────────────────────────────────────────────
+  const heroIdx = result.findIndex((b) =>
+    HERO_TYPES.has((b as Record<string, unknown>).type as string)
+  );
+
+  if (heroIdx >= 0) {
+    const hero = result[heroIdx] as Record<string, unknown>;
+
+    if (hero.type !== dna.heroType) {
+      // Types are incompatible — replace with skeleton, preserving shared props
+      const skeleton = createSkeletonBlock(dna.heroType, dna.heroVariant);
+      if (skeleton) {
+        if (hero.headline) skeleton.headline = hero.headline;
+        if (hero.subheadline) skeleton.subheadline = hero.subheadline;
+        if (hero.ctaText) skeleton.ctaText = hero.ctaText;
+        if (hero.ctaHref) skeleton.ctaHref = hero.ctaHref;
+        result[heroIdx] = skeleton as Block;
+        repairs.push(`[blueprint] Replaced hero ${hero.type} → ${dna.heroType}(${dna.heroVariant})`);
+      }
+    } else if (hero.variant !== dna.heroVariant) {
+      hero.variant = dna.heroVariant;
+      repairs.push(`[blueprint] Hero variant → ${dna.heroVariant}`);
+    }
+
+    // Move hero to position 0 if needed
+    if (heroIdx > 0) {
+      const [h] = result.splice(heroIdx, 1);
+      result.unshift(h);
+      repairs.push(`[blueprint] Moved hero from index ${heroIdx} to 0`);
+    }
+  } else {
+    // No hero at all — insert skeleton
+    const skeleton = createSkeletonBlock(dna.heroType, dna.heroVariant);
+    if (skeleton) {
+      result.unshift(skeleton as Block);
+      repairs.push(`[blueprint] Inserted missing hero ${dna.heroType}(${dna.heroVariant})`);
+    }
+  }
+
+  // ── Step 2: Remove forbidden blocks ──────────────────────────────────
+  const forbiddenSet = new Set(dna.forbiddenBlocks);
+  result = result.filter((b) => {
+    const bType = (b as Record<string, unknown>).type as string;
+    if (forbiddenSet.has(bType)) {
+      repairs.push(`[blueprint] Removed forbidden block "${bType}"`);
+      return false;
+    }
+    return true;
+  });
+
+  // ── Step 3: Insert missing required blocks ───────────────────────────
+  const presentTypes = new Set(
+    result.map((b) => (b as Record<string, unknown>).type as string)
+  );
+  for (const required of dna.requiredBlocks) {
+    if (!presentTypes.has(required)) {
+      const defaultVariant = DEFAULT_VARIANTS[required] || '';
+      const skeleton = createSkeletonBlock(required, defaultVariant);
+      if (skeleton) {
+        result.push(skeleton as Block); // appended; ordering is handled in step 4
+        repairs.push(`[blueprint] Inserted missing required block "${required}"`);
+        presentTypes.add(required);
+      }
+    }
+  }
+
+  // ── Step 4: Order enforcement ────────────────────────────────────────
+  // Separate blocks into spine (in sectionOrder) and optional
+  const sectionOrderSet = new Set(dna.sectionOrder);
+  const spineBlocks: Block[] = [];
+  const optionalBlocks: Block[] = [];
+
+  // Track original positions for optional block interleaving
+  const originalPositions = new Map<Block, number>();
+  result.forEach((b, i) => originalPositions.set(b, i));
+
+  for (const block of result) {
+    const bType = (block as Record<string, unknown>).type as string;
+    if (sectionOrderSet.has(bType)) {
+      spineBlocks.push(block);
+    } else {
+      optionalBlocks.push(block);
+    }
+  }
+
+  // Sort spine blocks by sectionOrder index
+  spineBlocks.sort((a, b) => {
+    const aType = (a as Record<string, unknown>).type as string;
+    const bType = (b as Record<string, unknown>).type as string;
+    return dna.sectionOrder.indexOf(aType) - dna.sectionOrder.indexOf(bType);
+  });
+
+  // Sort optional blocks by original position (preserve relative order)
+  optionalBlocks.sort(
+    (a, b) => (originalPositions.get(a) ?? 0) - (originalPositions.get(b) ?? 0)
+  );
+
+  // Interleave: place optional blocks between spine blocks based on original position
+  const reordered: Block[] = [];
+  let optIdx = 0;
+
+  for (let ri = 0; ri < spineBlocks.length; ri++) {
+    reordered.push(spineBlocks[ri]);
+
+    const currentSpineOrigPos = originalPositions.get(spineBlocks[ri]) ?? 0;
+    const nextSpineOrigPos =
+      ri + 1 < spineBlocks.length
+        ? (originalPositions.get(spineBlocks[ri + 1]) ?? Infinity)
+        : Infinity;
+
+    while (optIdx < optionalBlocks.length) {
+      const optOrigPos = originalPositions.get(optionalBlocks[optIdx]) ?? 0;
+      if (optOrigPos > currentSpineOrigPos && optOrigPos < nextSpineOrigPos) {
+        reordered.push(optionalBlocks[optIdx]);
+        optIdx++;
+      } else {
+        break;
+      }
+    }
+  }
+
+  // Append any remaining optional blocks before CTA/Footer
+  while (optIdx < optionalBlocks.length) {
+    reordered.push(optionalBlocks[optIdx]);
+    optIdx++;
+  }
+
+  // Safety: ensure hero first, footer last
+  const finalHeroIdx = reordered.findIndex((b) =>
+    HERO_TYPES.has((b as Record<string, unknown>).type as string)
+  );
+  if (finalHeroIdx > 0) {
+    const [h] = reordered.splice(finalHeroIdx, 1);
+    reordered.unshift(h);
+  }
+  const finalFooterIdx = reordered.findIndex(
+    (b) => (b as Record<string, unknown>).type === 'FooterSimple'
+  );
+  if (finalFooterIdx >= 0 && finalFooterIdx < reordered.length - 1) {
+    const [f] = reordered.splice(finalFooterIdx, 1);
+    reordered.push(f);
+  }
+
+  // Check if order changed
+  const originalOrder = result.map((b) => (b as Record<string, unknown>).type).join(',');
+  const newOrder = reordered.map((b) => (b as Record<string, unknown>).type).join(',');
+  if (originalOrder !== newOrder) {
+    repairs.push(`[blueprint] Reordered blocks to match sectionOrder`);
+  }
+
+  result = reordered;
+
+  // ── Step 5: Block count check ────────────────────────────────────────
+  if (result.length < dna.blockCount.min) {
+    repairs.push(`[blueprint] Warning: ${result.length} blocks < minimum ${dna.blockCount.min}`);
+  }
+  if (result.length > dna.blockCount.max) {
+    const requiredTypeSet = new Set(dna.requiredBlocks);
+    const keepTypes = new Set([...HERO_TYPES, 'CTASection', 'FooterSimple']);
+
+    while (result.length > dna.blockCount.max) {
+      // Find the last optional (trimmable) block
+      let trimIdx = -1;
+      for (let i = result.length - 1; i >= 0; i--) {
+        const bType = (result[i] as Record<string, unknown>).type as string;
+        if (!keepTypes.has(bType) && !requiredTypeSet.has(bType)) {
+          trimIdx = i;
+          break;
+        }
+      }
+      if (trimIdx < 0) break;
+      const removed = result.splice(trimIdx, 1)[0];
+      repairs.push(
+        `[blueprint] Trimmed optional block "${(removed as Record<string, unknown>).type}" (exceeded max ${dna.blockCount.max})`
+      );
+    }
+  }
+
+  return { blocks: result, repairs };
 }

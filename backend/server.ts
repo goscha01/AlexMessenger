@@ -24,7 +24,7 @@ import {
   flattenBlocks,
   applyQAPatchClaude,
 } from '@/lib/llm/claude';
-import { validateAndAutofixV3 } from '@/lib/rules/autofix';
+import { validateAndAutofixV3, computeNoveltyLocks, enforceBlueprintCompliance } from '@/lib/rules/autofix';
 import {
   getStyle,
   resolveStyleTokens,
@@ -33,7 +33,6 @@ import {
   loadStyleLibrary,
 } from '@/lib/design/loadStyleLibrary';
 import { STYLE_DNA_MAP } from '@/lib/design/layoutDNA';
-import { computeNoveltyLocks } from '@/lib/rules/autofix';
 
 // ─── Shared Browser Instance ───────────────────────────────────────────────────
 
@@ -835,6 +834,20 @@ app.post('/finalize', async (req: Request, res: Response) => {
 
     console.log(`[finalize] Valid blocks: ${validBlocks.length}, warnings: ${warnings.length}`);
 
+    // Step 4b: Blueprint compliance enforcement
+    let finalBlocks = validBlocks;
+    if (selectedDNA) {
+      const { blocks: compliantBlocks, repairs } = enforceBlueprintCompliance(validBlocks, selectedDNA);
+      finalBlocks = compliantBlocks;
+      if (repairs.length > 0) {
+        console.log(`[finalize] Blueprint repairs: ${repairs.length}`);
+        for (const r of repairs) console.log(`[finalize]   ${r}`);
+        warnings.push(...repairs);
+      } else {
+        console.log(`[finalize] Blueprint: fully compliant, no repairs needed`);
+      }
+    }
+
     // Step 5: Resolve tokens
     const resolvedTokens = resolveStyleTokens(style, content.brandName);
     const signature = getSignatureForStyle(input.styleId);
@@ -850,11 +863,11 @@ app.post('/finalize', async (req: Request, res: Response) => {
         headingFont: resolvedTokens.typography.headingFont,
         bodyFont: resolvedTokens.typography.bodyFont,
       },
-      blocks: validBlocks,
+      blocks: finalBlocks,
     };
 
-    // Step 5b: Compute novelty locks from validated blocks + DNA
-    const noveltyLocks = computeNoveltyLocks(validBlocks, selectedDNA);
+    // Step 5b: Compute novelty locks from blueprint-enforced blocks + DNA
+    const noveltyLocks = computeNoveltyLocks(finalBlocks, selectedDNA);
     console.log(`[finalize] Novelty locks: hero=${noveltyLocks.heroTypeLocked}(${noveltyLocks.heroVariantLocked}), required=${noveltyLocks.requiredBlockTypes.join(',')}`);
 
     // Step 6: Score (with DNA)
